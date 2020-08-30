@@ -4,10 +4,6 @@ title: About Me
 permalink: /about/
 ---
 
-This is where you put the contents of your *About* page. Like all your pages, it's in [Markdown](https://guides.github.com/features/mastering-markdown/) format.
+Chi is now working at Google, before which he has worked for Xiaomi, Amazon and PDD as a software engineer. His experiences include data and machine learning, especially in Ads and NLP.
 
-This website is powered by **[fastpages](https://github.com/fastai/fastpages)** [^1].
-
-
-
-[^1]:a blogging platform that natively supports Jupyter notebooks in addition to other formats.
+You can learn more about him in his [LinkedIn](https://www.linkedin.com/in/chizhangzju) page.

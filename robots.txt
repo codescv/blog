@@ -1,1 +1,1 @@
-Sitemap: https://codescv.github.io/blog/sitemap.xml
+Sitemap: https://blog.codescv.com/sitemap.xml

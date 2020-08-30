@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="twitter:card" content="summary" /><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>使用Key Indexing来避免初始化 | Chi</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="使用Key Indexing来避免初始化" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="在c/c++中, 使用new或者malloc来分配int数组是很快的, 因为没有初始化过程. 但是在使用时会有问题: 如果 不初始化, 如何知道哪一项的数据是有效的? 如果初始化, 那么效率又会比较低下." />
+<meta property="og:description" content="在c/c++中, 使用new或者malloc来分配int数组是很快的, 因为没有初始化过程. 但是在使用时会有问题: 如果 不初始化, 如何知道哪一项的数据是有效的? 如果初始化, 那么效率又会比较低下." />
+<link rel="canonical" href="https://blog.codescv.com/algorithms/key-indexing.html" />
+<meta property="og:url" content="https://blog.codescv.com/algorithms/key-indexing.html" />
+<meta property="og:site_name" content="Chi" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2013-08-04T16:59:00-05:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.codescv.com/algorithms/key-indexing.html"},"description":"在c/c++中, 使用new或者malloc来分配int数组是很快的, 因为没有初始化过程. 但是在使用时会有问题: 如果 不初始化, 如何知道哪一项的数据是有效的? 如果初始化, 那么效率又会比较低下.","@type":"BlogPosting","url":"https://blog.codescv.com/algorithms/key-indexing.html","headline":"使用Key Indexing来避免初始化","dateModified":"2013-08-04T16:59:00-05:00","datePublished":"2013-08-04T16:59:00-05:00","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="https://blog.codescv.com/feed.xml" title="Chi" /><link rel="shortcut icon" type="image/x-icon" href="/images/favicon.ico"><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>使用Key Indexing来避免初始化 | Chi</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="使用Key Indexing来避免初始化" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="在c/c++中, 使用new或者malloc来分配int数组是很快的, 因为没有初始化过程. 但是在使用时会有问题: 如果 不初始化, 如何知道哪一项的数据是有效的? 如果初始化, 那么效率又会比较低下." />
+<meta property="og:description" content="在c/c++中, 使用new或者malloc来分配int数组是很快的, 因为没有初始化过程. 但是在使用时会有问题: 如果 不初始化, 如何知道哪一项的数据是有效的? 如果初始化, 那么效率又会比较低下." />
+<link rel="canonical" href="https://blog.codescv.com/algorithms/key-indexing.html" />
+<meta property="og:url" content="https://blog.codescv.com/algorithms/key-indexing.html" />
+<meta property="og:site_name" content="Chi" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2013-08-04T16:59:00-05:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.codescv.com/algorithms/key-indexing.html"},"description":"在c/c++中, 使用new或者malloc来分配int数组是很快的, 因为没有初始化过程. 但是在使用时会有问题: 如果 不初始化, 如何知道哪一项的数据是有效的? 如果初始化, 那么效率又会比较低下.","@type":"BlogPosting","url":"https://blog.codescv.com/algorithms/key-indexing.html","headline":"使用Key Indexing来避免初始化","dateModified":"2013-08-04T16:59:00-05:00","datePublished":"2013-08-04T16:59:00-05:00","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+<link href="https://unpkg.com/@primer/css/dist/primer.css" rel="stylesheet" />
+<link rel="stylesheet" href="//use.fontawesome.com/releases/v5.0.7/css/all.css"><link type="application/atom+xml" rel="alternate" href="https://blog.codescv.com/feed.xml" title="Chi" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.css" integrity="sha384-zB1R0rpPzHqg7Kpt0Aljp8JPLqbXI3bhnPWROx27a9N0Ll6ZP/+DiW/UqRcLbRjq" crossorigin="anonymous">
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"> </script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.js" integrity="sha384-y23I5Q6l+B6vatafAwxRu/0oK/79VlbSz7Q9aiSZUvyWYIYsd+qj+o24G5ZU2zJz" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous"></script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement( document.body, {
+        delimiters: [
+            {left: "$$", right: "$$", display: true},
+            {left: "[%", right: "%]", display: true},
+            {left: "$", right: "$", display: false}
+        ]}
+        );
+    });
+    </script>
+
+
+<script>
+function wrap_img(fn) {
+    if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
+        var elements = document.querySelectorAll(".post img");
+        Array.prototype.forEach.call(elements, function(el, i) {
+            if (el.getAttribute("title") && (el.className != "emoji")) {
+                const caption = document.createElement('figcaption');
+                var node = document.createTextNode(el.getAttribute("title"));
+                caption.appendChild(node);
+                const wrapper = document.createElement('figure');
+                wrapper.className = 'image';
+                el.parentNode.insertBefore(wrapper, el);
+                el.parentNode.removeChild(el);
+                wrapper.appendChild(el);
+                wrapper.appendChild(caption);
+            }
+        });
+    } else { document.addEventListener('DOMContentLoaded', fn); }
+}
+window.onload = wrap_img;
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+    // add link icon to anchor tags
+    var elem = document.querySelectorAll(".anchor-link")
+    elem.forEach(e => (e.innerHTML = '<i class="fas fa-link fa-xs"></i>'));
+    });
+</script>
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Chi</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About Me</a><a class="page-link" href="/search/">Search</a><a class="page-link" href="/categories/">Tags</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">使用Key Indexing来避免初始化</h1><p class="post-meta post-meta-title"><time class="dt-published" datetime="2013-08-04T16:59:00-05:00" itemprop="datePublished">
+        Aug 4, 2013
+      </time>
+       • <span class="read-time" title="Estimated read time">
+    
+    
+      1 min read
+    
+</span></p>
+
+    
+      <p class="category-tags"><i class="fas fa-tags category-tags-icon"></i></i> 
+      
+        <a class="category-tags-link" href="/categories/#algorithms">algorithms</a>
+        
+      
+      </p>
+    
+
+    </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <p>在c/c++中, 使用<code class="highlighter-rouge">new</code>或者<code class="highlighter-rouge">malloc</code>来分配int数组是很快的, 因为没有初始化过程. 但是在使用时会有问题: 如果
+不初始化, 如何知道哪一项的数据是有效的? 如果初始化, 那么效率又会比较低下.</p>
+
+<p>假设有一个比较大数组a[0..n-1], 数组里每项是一个int变量, 但只有k项被使用(k « n). 如何设计一个数据
+结构, 避免初始化a中所有的元素, 又能正确的访问数组中的每一项? 假设内存足够.</p>
+
+<p>可以使用两个长度为n的辅助数组from和to. 例如:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>        0 1 2 3 4 5 6 7 8 9
+a    = [?|1|?|?|2|?|?|9|?|?|]
+from = [?|0|?|?|2|?|?|1|?|?|]
+to   = [1|7|4|?|?|?|?|?|?|?|]
+              top
+</code></pre></div></div>
+
+<p>from数组表示的是, a[i]被初始化时, a数组中元素的个数, 也就是说, a[i]是第from[i]个被初始化的.</p>
+
+<p>to数组表示的是, 第i个被初始化的元素, 它在a中的下标是to[i].</p>
+
+<p>top表示的是to数组中有效元素的个数, 指向to数组中所有有效元素的下一项, 它的值等于目前a数组中有效元素的个数.</p>
+
+<p>图中为先后设置<code class="highlighter-rouge">a[1]=1; a[7]=9; a[4]=2;</code>后, a, from, to中的结果.</p>
+
+<p>在设置一个元素时, 使用如下方法:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>a[i] = number;
+if (!is_initialized(i)) {
+    from[i] = top;
+    to[top] = i;
+    top++;
+}
+</code></pre></div></div>
+
+<ul>
+  <li><code class="highlighter-rouge">a[1] = 1</code>后, from[1] = 0, to[0] = 1, top = 1;</li>
+  <li><code class="highlighter-rouge">a[7] = 9</code>后, from[7] = 1, to[1] = 7, top = 2;</li>
+  <li><code class="highlighter-rouge">a[4] = 2</code>后, from[4] = 2, to[2] = 4, top = 3.</li>
+</ul>
+
+<p>如何判断一个<code class="highlighter-rouge">a[i]</code>是否被初始化? 注意到如果<code class="highlighter-rouge">a[i]</code>被初始化了, 一定有<code class="highlighter-rouge">to[from[i]] == i</code>. 但是光有这个还不够, 因为<code class="highlighter-rouge">from[i]</code>可能指向<code class="highlighter-rouge">to</code>中某一个没初始化的位置, 使得<code class="highlighter-rouge">to[from[i]] == i</code>碰巧成立. 所以, 还得加上一个条件, 就是<code class="highlighter-rouge">from[i] &lt; top</code>. 这样, 如果<code class="highlighter-rouge">from[i]</code>不在<code class="highlighter-rouge">0..top-1</code>之内, 那么就一定没被初始化. 如果from[i]在<code class="highlighter-rouge">0..top</code>之内, 有两种情况, 一种是i在1,4,7之内, 这样一定有<code class="highlighter-rouge">to[from[i]] == i</code>, 那么a[i]已经被初始化过了; 一种是i不在1,4,7之内, 那么一定有<code class="highlighter-rouge">to[from[i]] != i</code>. 因此要判断a[i]是否被初始化, 可以用<code class="highlighter-rouge">from[i] &lt; top &amp;&amp; to[from[i]] == top</code>.</p>
+
+<p>这个技巧被称为key indexing, 在Programming Pearls里有提到过.</p>
+
+<p>换个角度想想, key indexing其实是hashing的一个特例! 它的hash function就返回原本的key. 这里的i就是key, from数组其实是hash function, 而to数组告诉我们元素i是否被初始化过. 于是from, to这两个数组可以用一个hash table来代替:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>a[i] = number;
+init_hash[i] = true;
+
+if (init_hash[i]) {
+    // 第i个元素被初始化过了
+    ...
+}
+</code></pre></div></div>
+
+<p>因此, 如果需要更省空间话, 可以用hashing来优化.</p>
+
+  </div><!-- from https://github.com/utterance/utterances -->
+<script src="https://utteranc.es/client.js"
+        repo="codescv/blog"
+        issue-term="title"
+        label="blogpost-comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script><a class="u-url" href="/algorithms/key-indexing.html" hidden></a>
+</article>
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col">
+        <p class="feed-subscribe">
+          <a href="/feed.xml">
+            <svg class="svg-icon orange">
+              <use xlink:href="/assets/minima-social-icons.svg#rss"></use>
+            </svg><span>Subscribe</span>
+          </a>
+        </p>
+      </div>
+      <div class="footer-col">
+        <p>Chi&#39;s blog about ML, NLP, Programming and others.</p>
+      </div>
+    </div>
+
+    <div class="social-links"><ul class="social-media-list"><li><a rel="me" href="https://github.com/codescv" title="codescv"><svg class="svg-icon grey"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg></a></li><li><a rel="me" href="https://twitter.com/codescv" title="codescv"><svg class="svg-icon grey"><use xlink:href="/assets/minima-social-icons.svg#twitter"></use></svg></a></li></ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

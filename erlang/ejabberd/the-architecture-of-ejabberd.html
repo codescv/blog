@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="twitter:card" content="summary" /><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>The Architecture of Ejabberd | Chi</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="The Architecture of Ejabberd" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="We have taken a quick tour through the socket infrastructure provided with ejabberd, and wrote a few listeners as an exercise. This time let’s take a look at the ejabberd as a whole and try to figure out what it is about." />
+<meta property="og:description" content="We have taken a quick tour through the socket infrastructure provided with ejabberd, and wrote a few listeners as an exercise. This time let’s take a look at the ejabberd as a whole and try to figure out what it is about." />
+<link rel="canonical" href="https://blog.codescv.com/erlang/ejabberd/the-architecture-of-ejabberd.html" />
+<meta property="og:url" content="https://blog.codescv.com/erlang/ejabberd/the-architecture-of-ejabberd.html" />
+<meta property="og:site_name" content="Chi" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2012-06-06T17:39:00-05:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.codescv.com/erlang/ejabberd/the-architecture-of-ejabberd.html"},"description":"We have taken a quick tour through the socket infrastructure provided with ejabberd, and wrote a few listeners as an exercise. This time let’s take a look at the ejabberd as a whole and try to figure out what it is about.","@type":"BlogPosting","url":"https://blog.codescv.com/erlang/ejabberd/the-architecture-of-ejabberd.html","headline":"The Architecture of Ejabberd","dateModified":"2012-06-06T17:39:00-05:00","datePublished":"2012-06-06T17:39:00-05:00","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="https://blog.codescv.com/feed.xml" title="Chi" /><link rel="shortcut icon" type="image/x-icon" href="/images/favicon.ico"><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>The Architecture of Ejabberd | Chi</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="The Architecture of Ejabberd" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="We have taken a quick tour through the socket infrastructure provided with ejabberd, and wrote a few listeners as an exercise. This time let’s take a look at the ejabberd as a whole and try to figure out what it is about." />
+<meta property="og:description" content="We have taken a quick tour through the socket infrastructure provided with ejabberd, and wrote a few listeners as an exercise. This time let’s take a look at the ejabberd as a whole and try to figure out what it is about." />
+<link rel="canonical" href="https://blog.codescv.com/erlang/ejabberd/the-architecture-of-ejabberd.html" />
+<meta property="og:url" content="https://blog.codescv.com/erlang/ejabberd/the-architecture-of-ejabberd.html" />
+<meta property="og:site_name" content="Chi" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2012-06-06T17:39:00-05:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.codescv.com/erlang/ejabberd/the-architecture-of-ejabberd.html"},"description":"We have taken a quick tour through the socket infrastructure provided with ejabberd, and wrote a few listeners as an exercise. This time let’s take a look at the ejabberd as a whole and try to figure out what it is about.","@type":"BlogPosting","url":"https://blog.codescv.com/erlang/ejabberd/the-architecture-of-ejabberd.html","headline":"The Architecture of Ejabberd","dateModified":"2012-06-06T17:39:00-05:00","datePublished":"2012-06-06T17:39:00-05:00","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+<link href="https://unpkg.com/@primer/css/dist/primer.css" rel="stylesheet" />
+<link rel="stylesheet" href="//use.fontawesome.com/releases/v5.0.7/css/all.css"><link type="application/atom+xml" rel="alternate" href="https://blog.codescv.com/feed.xml" title="Chi" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.css" integrity="sha384-zB1R0rpPzHqg7Kpt0Aljp8JPLqbXI3bhnPWROx27a9N0Ll6ZP/+DiW/UqRcLbRjq" crossorigin="anonymous">
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"> </script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.js" integrity="sha384-y23I5Q6l+B6vatafAwxRu/0oK/79VlbSz7Q9aiSZUvyWYIYsd+qj+o24G5ZU2zJz" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous"></script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement( document.body, {
+        delimiters: [
+            {left: "$$", right: "$$", display: true},
+            {left: "[%", right: "%]", display: true},
+            {left: "$", right: "$", display: false}
+        ]}
+        );
+    });
+    </script>
+
+
+<script>
+function wrap_img(fn) {
+    if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
+        var elements = document.querySelectorAll(".post img");
+        Array.prototype.forEach.call(elements, function(el, i) {
+            if (el.getAttribute("title") && (el.className != "emoji")) {
+                const caption = document.createElement('figcaption');
+                var node = document.createTextNode(el.getAttribute("title"));
+                caption.appendChild(node);
+                const wrapper = document.createElement('figure');
+                wrapper.className = 'image';
+                el.parentNode.insertBefore(wrapper, el);
+                el.parentNode.removeChild(el);
+                wrapper.appendChild(el);
+                wrapper.appendChild(caption);
+            }
+        });
+    } else { document.addEventListener('DOMContentLoaded', fn); }
+}
+window.onload = wrap_img;
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+    // add link icon to anchor tags
+    var elem = document.querySelectorAll(".anchor-link")
+    elem.forEach(e => (e.innerHTML = '<i class="fas fa-link fa-xs"></i>'));
+    });
+</script>
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Chi</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About Me</a><a class="page-link" href="/search/">Search</a><a class="page-link" href="/categories/">Tags</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">The Architecture of Ejabberd</h1><p class="post-meta post-meta-title"><time class="dt-published" datetime="2012-06-06T17:39:00-05:00" itemprop="datePublished">
+        Jun 6, 2012
+      </time>
+       • <span class="read-time" title="Estimated read time">
+    
+    
+      4 min read
+    
+</span></p>
+
+    
+      <p class="category-tags"><i class="fas fa-tags category-tags-icon"></i></i> 
+      
+        <a class="category-tags-link" href="/categories/#erlang">erlang</a>
+        &nbsp;
+      
+        <a class="category-tags-link" href="/categories/#ejabberd">ejabberd</a>
+        
+      
+      </p>
+    
+
+    </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <p>We have taken a quick tour through the socket infrastructure provided with ejabberd, and wrote a few listeners as an exercise. This time let’s take a look at the ejabberd as a whole and try to figure out what it is about.</p>
+
+<h2 id="overview">Overview</h2>
+<p><img src="/images/ejabberd_overview.png" alt="The ejabberd architecture overview" title="Ejabberd Overview" /></p>
+
+<p>Like many servers, ejabberd can inherently be broken up into three layers:</p>
+
+<ul>
+  <li><em>The Data Layer.</em> This layer handles how data get stored in databases, and ensures the integrity and constraints of data.</li>
+  <li><em>The Logic Layer.</em> This layer is the most complicated of all. It handles all the XMPP logics, as well as many other features, e.g.: http bindings, access controls, extensible modules and hooks, etc.</li>
+  <li><em>The Interface Layer.</em> This is the layer we have just talked about. It handles all the incoming data from and the outgoing data to the client.</li>
+</ul>
+
+<h2 id="the-data-layer">The Data Layer</h2>
+<p>Ejabberd primarily use <a href="http://www.erlang.org/doc/man/mnesia.html">mnesia</a> as its “database”. Mnesia is in fact a high-performance key-value pair storage system built into the erlang library. It provides many features such as:</p>
+
+<ul>
+  <li>Replication. Tables may be replicated at several nodes.</li>
+  <li>Atomic transactions. A series of table manipulation operations can be grouped into a single atomic transaction.</li>
+  <li>Location transparency. Programs can be written without knowledge of the actual location of data.</li>
+  <li>Extremely fast real time data searches.</li>
+</ul>
+
+<p>Some of its features, such as replication and realtime searches, make it eligible for an extremely extensible database system. However, ejabberd does not enforce its use; it provides ODBC interfaces to allow utilizing of other databases whenever possible. For example, sometimes it might be more convienient to allow the user to authenticate using data stored in an existing database server, or there may be some relational data that need to be used for some purpose. Generally, mnesia is suitable for real fast key-value searches, but performs pretty badly when you use it for “relational” lookups (using the mnesia:select the wrong way). Avoid relational data whenever possible (use key lookup) if you want to make good use of it.</p>
+
+<h2 id="the-logic-layer">The Logic Layer</h2>
+<p>The logic layer is the main and most import part of the ejabberd system. Some of its functionalities include:</p>
+
+<ul>
+  <li><em>Jabber Logics.</em> The client to server connection (typically on tcp/5222) is handled by the module ejabberd_c2s. The server to server connection (typically on tcp/5269) is handled by the modules ejabberd_s2s, ejabberd_s2s_in, ejabber_s2s_out. The HTTP bindings are handled by the ejabberd_http module.</li>
+  <li><em>Router.</em> The router handles the routing of most of the messages, i.e., when a Jabber client sends a <message> to another entity, how is the message routed to the correct destination? First ejabberd determines whether the message is a local or a remote one. It does so by looking at the "to" attribute to see if the host implied by the "to" attribute is hosted in itself. If so, the message is local; and is handled by ejabberd_local; otherwise it is treated as an s2s message.</message></li>
+  <li><em>Modules.</em> In additional to the core Jabber and Router logics, there is a large part of the ejabberd which can be plugged in only when necessary, and they are called <em>modules</em>. Modules can be started / stopped dynamically at any time, thus making the ejabberd server highly extensible even at runtime. Modules are widely used for various <iq> extensions (the so-called 'XEP's).</iq></li>
+  <li><em>Hooks</em>. You want to change the core logics in the ejabberd server? No problem. Hooks are everywhere to help you. A hook is a way by which you can change the behaviour of ejabberd by injecting your new code into the system, without changing any existing code. For example, if you want to roll up your message filter to filter out messages you don’t want, you can add a module hooking to the “filter_packet/3” hook. If you want to keep track of all the messages clients sent, you can write a function hooking to ‘user_send_packet/3’.</li>
+  <li><em>Access Control.</em> All users (including real jabber client users as well as  administrators) are stored the same way in ejabberd. Their privileges are determined by the <em>groups</em> they belong to. Hence, the access control modules in ejabberd allow us to distinguish users with their groups, thus providing different services for different users.</li>
+  <li><em>Utils and Libraries.</em> Some other libraries and utils exist in ejabberd for common purposes, e.g.: XML processing, SASL authentication, Encodings, Logger, etc. It is worth noting the ejabberd_logger is a very good logger module perfectly usable by any other projects.</li>
+</ul>
+
+<h2 id="the-interface-layer">The Interface Layer</h2>
+<p>This layer handles incoming data from and outgoing data from the client. Its main functionaly is to listen on a local port waiting for client connections, establish a connection any clients or servers when necessary, and exchange data. It supports TCP/TLS connections as well as UDP transport, as is described in our last discussions. It serves as the interface between the outer world and the ejabberd server.</p>
+
+
+  </div><!-- from https://github.com/utterance/utterances -->
+<script src="https://utteranc.es/client.js"
+        repo="codescv/blog"
+        issue-term="title"
+        label="blogpost-comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script><a class="u-url" href="/erlang/ejabberd/the-architecture-of-ejabberd.html" hidden></a>
+</article>
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col">
+        <p class="feed-subscribe">
+          <a href="/feed.xml">
+            <svg class="svg-icon orange">
+              <use xlink:href="/assets/minima-social-icons.svg#rss"></use>
+            </svg><span>Subscribe</span>
+          </a>
+        </p>
+      </div>
+      <div class="footer-col">
+        <p>Chi&#39;s blog about ML, NLP, Programming and others.</p>
+      </div>
+    </div>
+
+    <div class="social-links"><ul class="social-media-list"><li><a rel="me" href="https://github.com/codescv" title="codescv"><svg class="svg-icon grey"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg></a></li><li><a rel="me" href="https://twitter.com/codescv" title="codescv"><svg class="svg-icon grey"><use xlink:href="/assets/minima-social-icons.svg#twitter"></use></svg></a></li></ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

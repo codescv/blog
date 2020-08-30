@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="twitter:card" content="summary" /><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>分布式TensorFlow在Sparse模型上的实践 | Chi</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="分布式TensorFlow在Sparse模型上的实践" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="前言 如果你去搜TensorFlow教程，或者分布式TensorFlow教程，可能会搜到很多mnist或者word2vec的模型，但是对于Sparse模型(LR, WDL等)，研究的比较少，对于分布式训练的研究就更少了。最近刚刚基于分布式TensorFlow上线了一个LR的CTR模型，支持百亿级特征，训练速度也还不错，故写下一些个人的心得体会，如果有同学也在搞类似的模型欢迎一起讨论。" />
+<meta property="og:description" content="前言 如果你去搜TensorFlow教程，或者分布式TensorFlow教程，可能会搜到很多mnist或者word2vec的模型，但是对于Sparse模型(LR, WDL等)，研究的比较少，对于分布式训练的研究就更少了。最近刚刚基于分布式TensorFlow上线了一个LR的CTR模型，支持百亿级特征，训练速度也还不错，故写下一些个人的心得体会，如果有同学也在搞类似的模型欢迎一起讨论。" />
+<link rel="canonical" href="https://blog.codescv.com/dist-tf-for-sparse-models.html" />
+<meta property="og:url" content="https://blog.codescv.com/dist-tf-for-sparse-models.html" />
+<meta property="og:site_name" content="Chi" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2018-05-19T21:00:00-05:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.codescv.com/dist-tf-for-sparse-models.html"},"description":"前言 如果你去搜TensorFlow教程，或者分布式TensorFlow教程，可能会搜到很多mnist或者word2vec的模型，但是对于Sparse模型(LR, WDL等)，研究的比较少，对于分布式训练的研究就更少了。最近刚刚基于分布式TensorFlow上线了一个LR的CTR模型，支持百亿级特征，训练速度也还不错，故写下一些个人的心得体会，如果有同学也在搞类似的模型欢迎一起讨论。","@type":"BlogPosting","url":"https://blog.codescv.com/dist-tf-for-sparse-models.html","headline":"分布式TensorFlow在Sparse模型上的实践","dateModified":"2018-05-19T21:00:00-05:00","datePublished":"2018-05-19T21:00:00-05:00","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="https://blog.codescv.com/feed.xml" title="Chi" /><link rel="shortcut icon" type="image/x-icon" href="/images/favicon.ico"><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>分布式TensorFlow在Sparse模型上的实践 | Chi</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="分布式TensorFlow在Sparse模型上的实践" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="前言 如果你去搜TensorFlow教程，或者分布式TensorFlow教程，可能会搜到很多mnist或者word2vec的模型，但是对于Sparse模型(LR, WDL等)，研究的比较少，对于分布式训练的研究就更少了。最近刚刚基于分布式TensorFlow上线了一个LR的CTR模型，支持百亿级特征，训练速度也还不错，故写下一些个人的心得体会，如果有同学也在搞类似的模型欢迎一起讨论。" />
+<meta property="og:description" content="前言 如果你去搜TensorFlow教程，或者分布式TensorFlow教程，可能会搜到很多mnist或者word2vec的模型，但是对于Sparse模型(LR, WDL等)，研究的比较少，对于分布式训练的研究就更少了。最近刚刚基于分布式TensorFlow上线了一个LR的CTR模型，支持百亿级特征，训练速度也还不错，故写下一些个人的心得体会，如果有同学也在搞类似的模型欢迎一起讨论。" />
+<link rel="canonical" href="https://blog.codescv.com/dist-tf-for-sparse-models.html" />
+<meta property="og:url" content="https://blog.codescv.com/dist-tf-for-sparse-models.html" />
+<meta property="og:site_name" content="Chi" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2018-05-19T21:00:00-05:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.codescv.com/dist-tf-for-sparse-models.html"},"description":"前言 如果你去搜TensorFlow教程，或者分布式TensorFlow教程，可能会搜到很多mnist或者word2vec的模型，但是对于Sparse模型(LR, WDL等)，研究的比较少，对于分布式训练的研究就更少了。最近刚刚基于分布式TensorFlow上线了一个LR的CTR模型，支持百亿级特征，训练速度也还不错，故写下一些个人的心得体会，如果有同学也在搞类似的模型欢迎一起讨论。","@type":"BlogPosting","url":"https://blog.codescv.com/dist-tf-for-sparse-models.html","headline":"分布式TensorFlow在Sparse模型上的实践","dateModified":"2018-05-19T21:00:00-05:00","datePublished":"2018-05-19T21:00:00-05:00","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+<link href="https://unpkg.com/@primer/css/dist/primer.css" rel="stylesheet" />
+<link rel="stylesheet" href="//use.fontawesome.com/releases/v5.0.7/css/all.css"><link type="application/atom+xml" rel="alternate" href="https://blog.codescv.com/feed.xml" title="Chi" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.css" integrity="sha384-zB1R0rpPzHqg7Kpt0Aljp8JPLqbXI3bhnPWROx27a9N0Ll6ZP/+DiW/UqRcLbRjq" crossorigin="anonymous">
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"> </script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.js" integrity="sha384-y23I5Q6l+B6vatafAwxRu/0oK/79VlbSz7Q9aiSZUvyWYIYsd+qj+o24G5ZU2zJz" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous"></script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement( document.body, {
+        delimiters: [
+            {left: "$$", right: "$$", display: true},
+            {left: "[%", right: "%]", display: true},
+            {left: "$", right: "$", display: false}
+        ]}
+        );
+    });
+    </script>
+
+
+<script>
+function wrap_img(fn) {
+    if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
+        var elements = document.querySelectorAll(".post img");
+        Array.prototype.forEach.call(elements, function(el, i) {
+            if (el.getAttribute("title") && (el.className != "emoji")) {
+                const caption = document.createElement('figcaption');
+                var node = document.createTextNode(el.getAttribute("title"));
+                caption.appendChild(node);
+                const wrapper = document.createElement('figure');
+                wrapper.className = 'image';
+                el.parentNode.insertBefore(wrapper, el);
+                el.parentNode.removeChild(el);
+                wrapper.appendChild(el);
+                wrapper.appendChild(caption);
+            }
+        });
+    } else { document.addEventListener('DOMContentLoaded', fn); }
+}
+window.onload = wrap_img;
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+    // add link icon to anchor tags
+    var elem = document.querySelectorAll(".anchor-link")
+    elem.forEach(e => (e.innerHTML = '<i class="fas fa-link fa-xs"></i>'));
+    });
+</script>
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Chi</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About Me</a><a class="page-link" href="/search/">Search</a><a class="page-link" href="/categories/">Tags</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">分布式TensorFlow在Sparse模型上的实践</h1><p class="post-meta post-meta-title"><time class="dt-published" datetime="2018-05-19T21:00:00-05:00" itemprop="datePublished">
+        May 19, 2018
+      </time>
+       • <span class="read-time" title="Estimated read time">
+    
+    
+      4 min read
+    
+</span></p>
+
+    
+
+    </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <h1 id="前言">前言</h1>
+<p>如果你去搜TensorFlow教程，或者分布式TensorFlow教程，可能会搜到很多mnist或者word2vec的模型，但是对于Sparse模型(LR, WDL等)，研究的比较少，对于分布式训练的研究就更少了。最近刚刚基于分布式TensorFlow上线了一个LR的CTR模型，支持百亿级特征，训练速度也还不错，故写下一些个人的心得体会，如果有同学也在搞类似的模型欢迎一起讨论。</p>
+
+<h1 id="训练相关">训练相关</h1>
+<h2 id="集群setup">集群setup</h2>
+<p>分布式TensorFlow中有三种角色: Master(Chief), PS和Worker. 其中Master负责训练的启动和停止，全局变量的初始化等；PS负责存储和更新所有训练的参数(变量); Worker负责每个mini batch的梯度计算。如果去网上找分布式TensorFlow的教程，一个普遍的做法是使用Worker 0作为Master, 例如<a href="https://github.com/tensorflow/tensorflow/blob/master/tensorflow/tools/dist_test/python/mnist_replica.py">这里</a>官方给出的例子。我个人比较建议把master独立出来，不参与训练，只进行训练过程的管理, 这样有几个好处:</p>
+
+<ol>
+  <li>独立出Master用于训练的任务分配，状态管理，Evaluation, Checkpoint等，可以让代码更加清晰。</li>
+  <li>Master由于任务比worker多，往往消耗的资源如CPU/内存也和worker不一样。独立出来以后，在k8s上比较容易分配不同的资源。</li>
+  <li>一些训练框架如Kubeflow使用Master的状态来确定整个任务的状态。</li>
+</ol>
+
+<h2 id="训练样本的分配">训练样本的分配</h2>
+<p>在sparse模型中，采用分布式训练的原因一般有两种:</p>
+<ol>
+  <li>数据很多，希望用多个worker加速。</li>
+  <li>模型很大，希望用多个PS来加速。</li>
+</ol>
+
+<p>前一个就涉及到训练样本怎么分配的问题。从目前网上公开的关于分布式TF训练的讨论，以及官方分布式的文档和教程中，很少涉及这个问题，因此最佳实践并不清楚。我目前的解决方法是引入一个zookeeper进行辅助。由master把任务写到zookeeper, 每个worker去读取自己应该训练哪些文件。基本流程如下:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># master
+</span><span class="n">file_list</span> <span class="o">=</span> <span class="n">list_dir</span><span class="p">(</span><span class="n">flags</span><span class="o">.</span><span class="n">input_dir</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">worker</span><span class="p">,</span> <span class="n">worker_file</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">workers</span><span class="p">,</span> <span class="n">file_list</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">zk</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">f</span><span class="s">'/jobs/{worker}'</span><span class="p">,</span> <span class="s">','</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">worker_file</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s">'utf8'</span><span class="p">),</span> <span class="n">makepath</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+<span class="c1"># start master session ...
+</span>
+<span class="c1"># worker
+</span><span class="n">wait_for_jobs</span> <span class="o">=</span> <span class="n">Semaphore</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="o">@</span><span class="bp">self</span><span class="o">.</span><span class="n">zk</span><span class="o">.</span><span class="n">DataWatch</span><span class="p">(</span><span class="n">f</span><span class="s">"/jobs/{worker}"</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">watch_jobs</span><span class="p">(</span><span class="n">jobs</span><span class="p">,</span> <span class="n">_stat</span><span class="p">,</span> <span class="n">_event</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">jobs</span><span class="p">:</span>
+        <span class="n">data_paths</span> <span class="o">=</span> <span class="n">jobs</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s">'utf8'</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">','</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">train_data_paths</span> <span class="o">=</span> <span class="n">data_paths</span>
+        <span class="n">wait_for_jobs</span><span class="o">.</span><span class="n">release</span><span class="p">()</span>
+
+<span class="n">wait_for_jobs</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+<span class="c1"># start worker session ...
+</span></code></pre></div></div>
+<p>引入zookeeper之后，文件的分配就变得非常灵活，并且后续也可以加入使用master监控worker状态等功能。</p>
+
+<h2 id="使用device_filter">使用device_filter</h2>
+<p>启动分布式TF集群时，每个节点都会启动一个Server. 默认情况下，每个节点都会跟其他节点进行通信，然后再开始创建Session. 在集群节点多时，会带来两个问题：</p>
+<ol>
+  <li>由于每个节点两两通信，造成训练的启动会比较慢。</li>
+  <li>当某些worker挂掉重启（例如因为内存消耗过多），如果其他某些worker已经跑完结束了，重启后的worker就会卡住，一直等待其他的worker。此时会显示log: <code class="highlighter-rouge">CreateSession still waiting for response from worker: /job:worker/replica:0/task:x</code>.</li>
+</ol>
+
+<p>解决这个问题的方法是使用device filter. 例如:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">config</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">ConfigProto</span><span class="p">(</span><span class="n">device_filters</span><span class="o">=</span><span class="p">[</span><span class="s">"/job:ps"</span><span class="p">,</span> <span class="n">f</span><span class="s">"/job:{self.task_type}/task:{self.task_index}"</span><span class="p">])</span>
+
+<span class="k">with</span> <span class="n">tf</span><span class="o">.</span><span class="n">train</span><span class="o">.</span><span class="n">MonitoredTrainingSession</span><span class="p">(</span>
+    <span class="o">...</span><span class="p">,</span>
+    <span class="n">config</span><span class="o">=</span><span class="n">config</span>
+<span class="p">):</span>
+    <span class="o">...</span>
+</code></pre></div></div>
+<p>这样，每个worker在启动时就只会和所有的PS进行通信，而不会和其他worker进行通信，既提高了启动速度，又提高了健壮性。</p>
+
+<h2 id="给sessionrun加上timeout">给session.run加上timeout</h2>
+<p>有时在一个batch比较大时，由于HDFS暂时不可用或者延时高等原因，有可能会导致<code class="highlighter-rouge">session.run</code>卡住。可以给它加一个timeout来提高程序的健壮性。</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">session</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">fetches</span><span class="p">,</span> <span class="n">feed_dict</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="n">tf</span><span class="o">.</span><span class="n">RunOptions</span><span class="p">(</span><span class="n">timeout_in_ms</span><span class="o">=</span><span class="n">timeout</span><span class="p">))</span>
+</code></pre></div></div>
+
+<h2 id="优雅的停止训练">优雅的停止训练</h2>
+<p>在很多分布式的例子里(例如<a href="https://github.com/tensorflow/tensorflow/blob/master/tensorflow/tools/dist_test/python/mnist_replica.py">官方</a>的这个)，都没有涉及到训练怎么停止的问题。通常的做法都是这样:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">server</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">train</span><span class="o">.</span><span class="n">Server</span><span class="p">(</span>
+        <span class="n">cluster</span><span class="p">,</span> <span class="n">job_name</span><span class="o">=</span><span class="n">FLAGS</span><span class="o">.</span><span class="n">job_name</span><span class="p">,</span> <span class="n">task_index</span><span class="o">=</span><span class="n">FLAGS</span><span class="o">.</span><span class="n">task_index</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">FLAGS</span><span class="o">.</span><span class="n">job_name</span> <span class="o">==</span> <span class="s">"ps"</span><span class="p">:</span>
+        <span class="n">server</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+</code></pre></div></div>
+<p>这样的话，一旦开始训练，PS就会block, 直到训练结束也不会停止，只能暴力删除任务(顺便说一下，MXNet更粗暴，PS运行完<code class="highlighter-rouge">import mxnet</code>就block了)。前面我们已经引入了zookeeper, 所以可以相对比较优雅的解决这个问题。master监控worker的状态，当worker全部完成后，master设置自己的状态为完成。PS和worker检测到master完成后，就结束自己。</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">join</span><span class="p">():</span>
+    <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+        <span class="n">status</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">zk</span><span class="o">.</span><span class="n">get_async</span><span class="p">(</span><span class="s">'/status/master'</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">status</span> <span class="o">==</span> <span class="s">'done'</span><span class="p">:</span>
+            <span class="k">break</span>
+        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+
+<span class="c1"># master
+</span><span class="k">for</span> <span class="n">worker</span> <span class="ow">in</span> <span class="n">workers</span><span class="p">:</span>
+    <span class="n">status</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">zk</span><span class="o">.</span><span class="n">get_async</span><span class="p">(</span><span class="n">f</span><span class="s">'/status/worker/{worker}'</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+    <span class="n">update_all_workers_done</span><span class="p">()</span>
+<span class="k">if</span> <span class="n">all_workers_done</span><span class="p">:</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">zk</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s">'/status/master'</span><span class="p">,</span> <span class="n">b</span><span class="s">'done'</span><span class="p">,</span> <span class="n">makepath</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+<span class="c1"># ps
+</span><span class="n">join</span><span class="p">()</span>
+
+<span class="c1"># worker
+</span><span class="k">while</span> <span class="n">has_more_data</span><span class="p">:</span>
+    <span class="n">train</span><span class="p">()</span>
+<span class="bp">self</span><span class="o">.</span><span class="n">zk</span><span class="o">.</span><span class="nb">set</span><span class="p">(</span><span class="s">'/status/worker/{worker}'</span><span class="p">,</span> <span class="n">b</span><span class="s">'done'</span><span class="p">)</span>
+<span class="n">join</span><span class="p">()</span>
+</code></pre></div></div>
+
+<h2 id="kubeflow的使用">Kubeflow的使用</h2>
+<p><a href="https://github.com/kubeflow/kubeflow">Kubeflow</a>是一个用于分布式TF训练提交任务的项目。它主要由两个部分组成，一是<a href="https://ksonnet.io/">ksonnet</a>，一是<a href="https://github.com/kubeflow/tf-operator">tf-operator</a>。ksonnet主要用于方便编写k8s上的manifest, tf-operator是真正起作用的部分，会帮你设置好<code class="highlighter-rouge">TF_CONFIG</code>这个关键的环境变量，你只需要设置多少个PS, 多少个worker就可以了。个人建议用ksonnet生成一个skeleton, 把tf-operator的manifest打印出来(使用<code class="highlighter-rouge">ks show -c default</code>), 以后就可以跳过ksonnet直接用tf-operator了。因为k8s的manifest往往也需要修改很多东西，最后还是要用程序生成，没必要先生成ksonnet再生成yaml.</p>
+
+<h2 id="estimator的局限性">Estimator的局限性</h2>
+<p>一开始我使用的是TF的高级API <code class="highlighter-rouge">Estimator</code>, 参考<a href="https://www.tensorflow.org/tutorials/wide_and_deep">这里</a>的WDL模型. 后来发现<code class="highlighter-rouge">Estimator</code>有一些问题，没法满足目前的需要。</p>
+
+<p>一是性能问题。我发现同样的linear model, 手写的模型是Estimator的性能的5-10倍。具体原因尚不清楚，有待进一步调查。</p>
+
+<p>UPDATE: 性能问题的原因找到了，TL;DR: 在sparse场景使用Dataset API时, 先batch再map(parse_example)会更快。详情见: https://stackoverflow.com/questions/50781373/using-feed-dict-is-more-than-5x-faster-than-using-dataset-api</p>
+
+<p>二灵活性问题。<code class="highlighter-rouge">Estimator</code> API目前支持分布式的接口是<a href="https://www.tensorflow.org/api_docs/python/tf/estimator/train_and_evaluate">train_and_evaluate</a>, 它的逻辑可以从源代码里看到:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># training.py
+</span><span class="k">def</span> <span class="nf">run_master</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="o">...</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_start_distributed_training</span><span class="p">(</span><span class="n">saving_listeners</span><span class="o">=</span><span class="n">saving_listeners</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">evaluator</span><span class="o">.</span><span class="n">is_final_export_triggered</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">'Training has already ended. But the last eval is skipped '</span>
+                    <span class="s">'due to eval throttle_secs. Now evaluating the final '</span>
+                    <span class="s">'checkpoint.'</span><span class="p">)</span>
+        <span class="n">evaluator</span><span class="o">.</span><span class="n">evaluate_and_export</span><span class="p">()</span>
+
+<span class="c1"># estimator.py
+</span><span class="k">def</span> <span class="nf">export_savedmodel</span><span class="p">(</span><span class="o">...</span><span class="p">):</span>
+    <span class="o">...</span>
+    <span class="k">with</span> <span class="n">tf_session</span><span class="o">.</span><span class="n">Session</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_session_config</span><span class="p">)</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+        <span class="n">saver_for_restore</span> <span class="o">=</span> <span class="n">estimator_spec</span><span class="o">.</span><span class="n">scaffold</span><span class="o">.</span><span class="n">saver</span> <span class="ow">or</span> <span class="n">saver</span><span class="o">.</span><span class="n">Saver</span><span class="p">(</span>
+            <span class="n">sharded</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="n">saver_for_restore</span><span class="o">.</span><span class="n">restore</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">checkpoint_path</span><span class="p">)</span>
+        <span class="o">...</span>
+        <span class="n">builder</span> <span class="o">=</span> <span class="o">...</span>
+        <span class="n">builder</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">as_text</span><span class="p">)</span>
+</code></pre></div></div>
+<p>可以看到<code class="highlighter-rouge">Estimator</code>有两个问题，一是运行完才进行evaluate, 但在大型的sparse model里，训练一轮可能要几个小时，我们希望一边训练一边evaluate, 在训练过程中就能尽快的掌握效果的变化(例如master只拿到test set, worker只拿到training set, 这样一开始就能evaluate)。二是每次导出模型时，<code class="highlighter-rouge">Estimator</code> API会新建一个session, 加载最近的一个checkpoint, 然后再导出模型。但实际上，一个sparse模型在TF里耗的内存可能是100多G，double一下会非常浪费，而且导出checkpoint也极慢，也是需要避免的。基于这两个问题，我暂时没有使用Estimator来进行训练。</p>
+
+<h2 id="使用feature-column但不使用estimator">使用feature column(但不使用Estimator)</h2>
+<p>虽然不能用<code class="highlighter-rouge">Estimator</code>, 但是使用feature column还是完全没有问题的。不幸的是网上几乎没有人这么用，所以我把我的使用方法分享一下，这其实也是<code class="highlighter-rouge">Estimator</code>的源代码里的使用方式:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># define feature columns as usual
+</span><span class="n">feature_columns</span> <span class="o">=</span> <span class="o">...</span>
+<span class="n">example</span> <span class="o">=</span> <span class="n">TFRecordDataset</span><span class="p">(</span><span class="o">...</span><span class="p">)</span><span class="o">.</span><span class="n">make_one_shot_iterator</span><span class="p">()</span><span class="o">.</span><span class="n">get_next</span><span class="p">()</span>
+<span class="n">parsed_example</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">parse_example</span><span class="p">(</span><span class="n">example</span><span class="p">,</span> <span class="n">tf</span><span class="o">.</span><span class="n">feature_column</span><span class="o">.</span><span class="n">make_parse_example_spec</span><span class="p">(</span><span class="n">feature_columns</span><span class="p">))</span>
+<span class="n">logits</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">feature_column</span><span class="o">.</span><span class="n">linear_model</span><span class="p">(</span>
+    <span class="n">features</span><span class="o">=</span><span class="n">parsed_example</span><span class="p">,</span>
+    <span class="n">feature_columns</span><span class="o">=</span><span class="n">feature_columns</span><span class="p">,</span>
+    <span class="n">cols_to_vars</span><span class="o">=</span><span class="n">cols_to_vars</span>
+<span class="p">)</span>
+</code></pre></div></div>
+<p><code class="highlighter-rouge">parse_example</code>会把<code class="highlighter-rouge">TFRecord</code>解析成一个feature dict, key是feature的名称，value是feature的值。<a href="https://www.tensorflow.org/api_docs/python/tf/feature_column/linear_model">tf.feature_column.linear_model</a>这个API会自动生成一个线性模型，并把变量(weight)的reference, 存在<code class="highlighter-rouge">cols_to_vars</code>这个字典中。如果使用dnn的模型，可以参考<a href="https://www.tensorflow.org/api_docs/python/tf/feature_column/input_layer">tf.feature_column.input_layer</a>这个API, 用法类似，会把feature dict转换成一个行向量。</p>
+
+<h2 id="模型导出">模型导出</h2>
+<p>使用多PS时，常见的做法是使用<code class="highlighter-rouge">tf.train.replica_device_setter</code>来把不同的变量放在不同的PS节点上。有时一个变量也会很大(这在sparse模型里很常见)，也需要拆分到不同的PS上。这时候就需要使用partitioner:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">partitioner</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">min_max_variable_partitioner</span><span class="p">(</span>
+    <span class="n">max_partitions</span><span class="o">=</span><span class="n">variable_partitions</span><span class="p">,</span>
+    <span class="n">min_slice_size</span><span class="o">=</span><span class="mi">64</span> <span class="o">&lt;&lt;</span> <span class="mi">20</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">tf</span><span class="o">.</span><span class="n">variable_scope</span><span class="p">(</span>
+    <span class="o">...</span><span class="p">,</span>
+    <span class="n">partitioner</span> <span class="o">=</span> <span class="n">partitioner</span>
+<span class="p">):</span>
+    <span class="c1"># define model
+</span></code></pre></div></div>
+<p>由于TensorFlow不支持sparse weight(注意: 跟sparse tensor是两码事，这里指的是被训练的变量不能是sparse的), 所以在PS上存的变量还是dense的，比如你的模型里有100亿的参数，那PS上就得存100亿。但实际上对于sparse模型，大部分的weight其实是0，最终有效的weight可能只有0.1% - 1%. 所以可以做一个优化，只导出非0参数:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">indices</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">tf</span><span class="o">.</span><span class="n">not_equal</span><span class="p">(</span><span class="n">vars_concat</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+<span class="n">values</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="n">vars_concat</span><span class="p">,</span> <span class="n">indices</span><span class="p">)</span>
+<span class="n">shape</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">vars_concat</span><span class="p">)</span>
+<span class="bp">self</span><span class="o">.</span><span class="n">variables</span><span class="p">[</span><span class="n">column_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s">'indices'</span><span class="p">:</span> <span class="n">indices</span><span class="p">,</span>
+    <span class="s">'values'</span><span class="p">:</span> <span class="n">values</span><span class="p">,</span>
+    <span class="s">'shape'</span><span class="p">:</span> <span class="n">shape</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>这样就把变量的非0下标，非0值和dense shape都放进了<code class="highlighter-rouge">self.variables</code>里，之后就只导出<code class="highlighter-rouge">self.variables</code>即可。</p>
+
+<p>此外, 在多PS的时候，做checkpoint的时候一定要记得enable sharding:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">saver</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">train</span><span class="o">.</span><span class="n">Saver</span><span class="p">(</span><span class="n">sharded</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">allow_empty</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+<span class="o">...</span>
+</code></pre></div></div>
+<p>这样在master进行checkpoint的时候，每个PS会并发写checkpoint文件。否则，所有参数会被传到master上进行集中写checkpoint, 消耗内存巨大。</p>
+
+<h3 id="导出优化">导出优化</h3>
+<p>前面提到的导出非0参数的方法仍有一个问题，就是会把参数都传到一台机器(master)上，计算出非0再保存。这一点可以由grafana上的监控验证:</p>
+
+<p><img src="/images/master-network.png" alt="" /></p>
+
+<p>可以看到，每隔一段时间进行模型导出时，master的网络IO就会达到一个峰值，是平时的好几倍。如果能把non_zero固定到PS上进行计算，则没有这个问题。代码如下:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">var_or_var_list</span><span class="p">:</span>
+    <span class="n">var_shape</span> <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">_save_slice_info</span><span class="o">.</span><span class="n">var_shape</span>
+    <span class="n">var_offset</span> <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">_save_slice_info</span><span class="o">.</span><span class="n">var_offset</span>
+    <span class="k">with</span> <span class="n">tf</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="n">var</span><span class="o">.</span><span class="n">device</span><span class="p">):</span>
+        <span class="n">var_</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">var_indices</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">tf</span><span class="o">.</span><span class="n">not_equal</span><span class="p">(</span><span class="n">var_</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="n">var_values</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="n">var_</span><span class="p">,</span> <span class="n">var_indices</span><span class="p">)</span>
+
+    <span class="n">indices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">var_indices</span> <span class="o">+</span> <span class="n">var_offset</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">values</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">var_values</span><span class="p">)</span>
+<span class="n">indices</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">indices</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+                    <span class="n">values</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+</code></pre></div></div>
+<p>进行了如上修改之后，master的网络消耗变成下图:</p>
+
+<p><img src="/images/ps-opt.png" alt="" /></p>
+
+<p>参考Tensorboard, 可以看到gather操作确实被放到了PS上进行运算:</p>
+
+<p><img src="/images/ps-opt-gather.png" alt="" /></p>
+
+<h2 id="模型上线">模型上线</h2>
+<p>我们目前在线上prediction时没有使用tf-serving, 而是将变量导出用Java服务进行prediction. 主要原因还是TF的PS不支持sparse存储，模型在单台机器存不下，没法使用serving.
+在自己实现LR的prediction时，要注意验证线上线下的一致性，有一些常见的坑，比如没加bias, default_value没处理，等等。</p>
+
+<h2 id="使用tensorboard来理解模型">使用TensorBoard来理解模型</h2>
+<p>在训练时用TensorBoard来打出Graph，对理解训练的细节很有帮助。例如，我们试图想象这么一个问题：在分布式训练中，参数的更新是如何进行的？以下有两种方案:</p>
+
+<ol>
+  <li>worker计算gradients, ps合并gradients并进行更新</li>
+  <li>worker计算gradients, 计算应该update成什么值，然后发给ps进行更新</li>
+</ol>
+
+<p>到底哪个是正确的？我们看一下TensorBoard就知道了:
+<img src="/images/tb_ftrl.png" alt="TensorBoard" />
+可以看到，FTRL的Operation是在PS上运行的。所以是第一种。</p>
+
+<h2 id="metrics">Metrics</h2>
+<p>在TensorFlow中有一系列<a href="https://www.tensorflow.org/api_docs/python/tf/metrics">metrics</a>, 例如accuracy, AUC等等，用于评估训练的指标。需要注意的是TensorFlow中的这些metrics都是在求历史平均值，而不是当前batch。所以如果训练一开始就进行评估，使用TensorFlow的AUC和Sklearn的AUC，会发现TensorFlow的AUC会低一些，因为TensorFlow的AUC其实是考虑了历史的所有样本。正因如此<code class="highlighter-rouge">Estimator</code>的evaluate才会有一个<code class="highlighter-rouge">step</code>的参数，例如运行100个step，就会得到这100个batch上的metric.</p>
+
+<h1 id="性能相关">性能相关</h1>
+<h2 id="profiling">profiling</h2>
+<p>要进行性能优化，首先必须先做profiling。可以使用<code class="highlighter-rouge">tf.train.ProfilerHook</code>来进行.</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">hooks</span> <span class="o">=</span> <span class="p">[</span><span class="n">tf</span><span class="o">.</span><span class="n">train</span><span class="o">.</span><span class="n">ProfilerHook</span><span class="p">(</span><span class="n">save_secs</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="n">profile_dir</span><span class="p">,</span> <span class="n">show_memory</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">show_dataflow</span><span class="o">=</span><span class="bp">True</span><span class="p">)]</span>
+</code></pre></div></div>
+<p>之后会写出timeline文件，可以使用chrome输入<code class="highlighter-rouge">chrome://tracing</code>来打开。</p>
+
+<p>我们来看一个例子:
+<img src="/images/timeline-pipeline.png" alt="" />
+上图中<code class="highlighter-rouge">IteratorGetNext</code>占用了非常长的时间。这其实是在从HDFS读取数据。我们加入<code class="highlighter-rouge">prefetch</code>后，profile变成下面这个样子:
+<img src="/images/timeline-pipeline-prefetch.png" alt="" />
+可以看到，加入prefetch以后HDFS读取延时和训练时间在相当的数量级，延时有所好转。</p>
+
+<p>另一个例子:
+<img src="/images/profile-partition-before.png" alt="" />
+可以看到, <code class="highlighter-rouge">RecvTensor</code>占用了大部分时间，说明瓶颈在PS上。经调查发现是partition太多(64)个而PS只有8个，造成传输数据效率下降。调整partition数量后变成如下:
+<img src="/images/profile-partition-after.png" alt="" /></p>
+
+<h2 id="使用grafana进行性能监控">使用Grafana进行性能监控</h2>
+<p>可以使用<code class="highlighter-rouge">Grafana</code>和<code class="highlighter-rouge">heapster</code>来进行集群节点以及Pod的监控，查看CPU,内存,网络等性能指标。</p>
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">extensions/v1beta1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Deployment</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">monitoring-grafana</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">kube-system</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">replicas</span><span class="pi">:</span> <span class="m">1</span>
+  <span class="na">template</span><span class="pi">:</span>
+    <span class="na">metadata</span><span class="pi">:</span>
+      <span class="na">labels</span><span class="pi">:</span>
+        <span class="na">task</span><span class="pi">:</span> <span class="s">monitoring</span>
+        <span class="na">k8s-app</span><span class="pi">:</span> <span class="s">grafana</span>
+    <span class="na">spec</span><span class="pi">:</span>
+      <span class="na">containers</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">grafana</span>
+        <span class="na">image</span><span class="pi">:</span> <span class="s">k8s.gcr.io/heapster-grafana-amd64:v4.4.3</span>
+        <span class="na">ports</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">containerPort</span><span class="pi">:</span> <span class="m">3000</span>
+          <span class="na">protocol</span><span class="pi">:</span> <span class="s">TCP</span>
+        <span class="na">volumeMounts</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">mountPath</span><span class="pi">:</span> <span class="s">/etc/ssl/certs</span>
+          <span class="na">name</span><span class="pi">:</span> <span class="s">ca-certificates</span>
+          <span class="na">readOnly</span><span class="pi">:</span> <span class="no">true</span>
+        <span class="pi">-</span> <span class="na">mountPath</span><span class="pi">:</span> <span class="s">/var</span>
+          <span class="na">name</span><span class="pi">:</span> <span class="s">grafana-storage</span>
+        <span class="na">env</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">INFLUXDB_HOST</span>
+          <span class="na">value</span><span class="pi">:</span> <span class="s">monitoring-influxdb</span>
+        <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">GF_SERVER_HTTP_PORT</span>
+          <span class="na">value</span><span class="pi">:</span> <span class="s2">"</span><span class="s">3000"</span>
+          <span class="c1"># The following env variables are required to make Grafana accessible via</span>
+          <span class="c1"># the kubernetes api-server proxy. On production clusters, we recommend</span>
+          <span class="c1"># removing these env variables, setup auth for grafana, and expose the grafana</span>
+          <span class="c1"># service using a LoadBalancer or a public IP.</span>
+        <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">GF_AUTH_BASIC_ENABLED</span>
+          <span class="na">value</span><span class="pi">:</span> <span class="s2">"</span><span class="s">false"</span>
+        <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">GF_AUTH_ANONYMOUS_ENABLED</span>
+          <span class="na">value</span><span class="pi">:</span> <span class="s2">"</span><span class="s">true"</span>
+        <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">GF_AUTH_ANONYMOUS_ORG_ROLE</span>
+          <span class="na">value</span><span class="pi">:</span> <span class="s">Admin</span>
+        <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">GF_SERVER_ROOT_URL</span>
+          <span class="c1"># If you're only using the API Server proxy, set this value instead:</span>
+          <span class="c1"># value: /api/v1/namespaces/kube-system/services/monitoring-grafana/proxy</span>
+          <span class="na">value</span><span class="pi">:</span> <span class="s">/</span>
+      <span class="na">volumes</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">ca-certificates</span>
+        <span class="na">hostPath</span><span class="pi">:</span>
+          <span class="na">path</span><span class="pi">:</span> <span class="s">/etc/ssl/certs</span>
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">grafana-storage</span>
+        <span class="na">emptyDir</span><span class="pi">:</span> <span class="pi">{}</span>
+<span class="nn">---</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Service</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">labels</span><span class="pi">:</span>
+    <span class="c1"># For use as a Cluster add-on (https://github.com/kubernetes/kubernetes/tree/master/cluster/addons)</span>
+    <span class="c1"># If you are NOT using this as an addon, you should comment out this line.</span>
+    <span class="s">kubernetes.io/cluster-service</span><span class="pi">:</span> <span class="s1">'</span><span class="s">true'</span>
+    <span class="s">kubernetes.io/name</span><span class="pi">:</span> <span class="s">monitoring-grafana</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">monitoring-grafana</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">kube-system</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="c1"># In a production setup, we recommend accessing Grafana through an external Loadbalancer</span>
+  <span class="c1"># or through a public IP.</span>
+  <span class="c1"># type: LoadBalancer</span>
+  <span class="c1"># You could also use NodePort to expose the service at a randomly-generated port</span>
+  <span class="c1"># type: NodePort</span>
+  <span class="na">ports</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">port</span><span class="pi">:</span> <span class="m">80</span>
+    <span class="na">targetPort</span><span class="pi">:</span> <span class="m">3000</span>
+  <span class="na">selector</span><span class="pi">:</span>
+    <span class="na">k8s-app</span><span class="pi">:</span> <span class="s">grafana</span>
+</code></pre></div></div>
+<p>部署到k8s集群之后，就可以分节点/Pod查看性能指标了。</p>
+
+<h2 id="psworker数量的设置">ps/worker数量的设置</h2>
+<p>PS和worker的数量需要如何设置？这个需要大量的实验，没有绝对的规律可循。一般来说sparse模型由于每条样本的特征少，所以PS不容易成为瓶颈，worker:PS可以设置的大一些。在我们的应用中，设置到1:8会达到比较好的性能。当PS太多时variable的分片也多，网络额外开销会大。当PS太少时worker拉参数会发生瓶颈。具体的实验可以参见下节。</p>
+
+<h2 id="加速比实验">加速比实验</h2>
+<p>实验方法：2.5亿样本，70亿特征(使用hash bucket后)，提交任务稳定后(20min)记录数据。</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>worker</th>
+      <th>PS</th>
+      <th>CPU/worker (cores)</th>
+      <th>CPU/PS (cores)</th>
+      <th>total CPU usage (cores)</th>
+      <th>memory/worker</th>
+      <th>memory/PS</th>
+      <th>total memory</th>
+      <th>k example/s</th>
+      <th>Network IO</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>8</td>
+      <td>8</td>
+      <td>1.5-2</td>
+      <td>0.7-0.8</td>
+      <td>19-23</td>
+      <td>2-2.5G</td>
+      <td>15G</td>
+      <td>150G</td>
+      <td>52</td>
+      <td>0.36 GB/s</td>
+    </tr>
+    <tr>
+      <td>16</td>
+      <td>8</td>
+      <td>1.3-2.6</td>
+      <td>1.0-1.4</td>
+      <td>40</td>
+      <td>2-2.5G</td>
+      <td>15G</td>
+      <td>170G</td>
+      <td>72</td>
+      <td>0.64 GB/s</td>
+    </tr>
+    <tr>
+      <td>32</td>
+      <td>8</td>
+      <td>1.8-2.3</td>
+      <td>1.5-2.0</td>
+      <td>70</td>
+      <td>2.2-3.0G</td>
+      <td>15G</td>
+      <td>216G</td>
+      <td>130</td>
+      <td>1.2 GB/s</td>
+    </tr>
+    <tr>
+      <td>64</td>
+      <td>8</td>
+      <td>1.5-2</td>
+      <td>4.0-6.4</td>
+      <td>150</td>
+      <td>2.2-3G</td>
+      <td>15G</td>
+      <td>288G</td>
+      <td>250</td>
+      <td>2.3 GB /s</td>
+    </tr>
+    <tr>
+      <td>64</td>
+      <td>16</td>
+      <td>1.7</td>
+      <td>2.9</td>
+      <td>169</td>
+      <td>2.2G</td>
+      <td>7.5G</td>
+      <td>300G</td>
+      <td>260</td>
+      <td>2.5 GB/s</td>
+    </tr>
+    <tr>
+      <td>128</td>
+      <td>16</td>
+      <td>1.5-2</td>
+      <td>3.9-5</td>
+      <td>278</td>
+      <td>2.2G</td>
+      <td>7.5G</td>
+      <td>469G</td>
+      <td>440</td>
+      <td>4.2 GB/s</td>
+    </tr>
+    <tr>
+      <td>128</td>
+      <td>32</td>
+      <td>1.5</td>
+      <td>2.5-3</td>
+      <td>342</td>
+      <td>2.2G</td>
+      <td>4-4.5G</td>
+      <td>489G</td>
+      <td>420</td>
+      <td>4.1 GB/s</td>
+    </tr>
+    <tr>
+      <td>160</td>
+      <td>20</td>
+      <td>1.2-1.5</td>
+      <td>3.0-4.0</td>
+      <td>360</td>
+      <td>2-2.5G</td>
+      <td>6-7G</td>
+      <td>572G</td>
+      <td>500</td>
+      <td>4.9 GB/s</td>
+    </tr>
+    <tr>
+      <td>160</td>
+      <td>32</td>
+      <td>1.2-1.5</td>
+      <td>1.0-1.4</td>
+      <td>388</td>
+      <td>2-2.5G</td>
+      <td>4-4.5G</td>
+      <td>598G</td>
+      <td>490</td>
+      <td>4.8 GB/s</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>结论:</p>
+<ol>
+  <li>worker消耗的内存基本是固定的；PS消耗的内存只跟特征规模有关;</li>
+  <li>worker消耗的CPU跟训练速度和数据读取速度有关; PS消耗的CPU和worker:PS的比例有关;</li>
+  <li>TensorFlow的线性scalability是不错的, 加速比大约可以到0.7-0.8;</li>
+  <li>最后加到160worker时性能提升达到瓶颈，这里的瓶颈在于HDFS的带宽(已经达到4.9GB/s)</li>
+  <li>在sparse模型中PS比较难以成为瓶颈，因为每条样本的特征不多，PS的带宽相对于HDFS的带宽可忽略不计</li>
+</ol>
+
+<h1 id="future-work">Future Work</h1>
+<h2 id="文件分配优化">文件分配优化</h2>
+<p>如果worker平均需要1个小时的时间，那么整个训练需要多少时间？如果把训练中的速度画一个图出来，会是类似于下面这样:</p>
+
+<p><img src="/images/train-speed.png" alt="" /></p>
+
+<p>在训练过程中我发现，快worker的训练速度大概是慢worker的1.2-1.5倍。而整个训练的时间取决于最慢的那个worker。所以这里可以有一个优化，就是动态分配文件，让每个worker尽可能同时结束。借助之前提到的zookeeper, 做到这一点不会很难。</p>
+
+<h2 id="online-learning">online learning</h2>
+<p>在online learning时，其实要解决的问题也是任务分配的问题。仍由master借助zookeeper进行任务分配，让每个worker去读指定的消息队列分区。</p>
+
+<h2 id="ps优化">PS优化</h2>
+<p>可以考虑给TensorFlow增加Sparse Variable的功能，让PS上的参数能够动态增长，这样就能解决checkpoint, 模型导出慢等问题。当然，这样肯定也会减慢训练速度，因为变量的保存不再是数组，而会是hashmap.</p>
+
+<h2 id="样本压缩">样本压缩</h2>
+<p>从前面的实验看到，后面训练速度上不去主要是因为网络带宽瓶颈了，读样本没有这么快。我们可以看看<code class="highlighter-rouge">TFRecord</code>的实现：</p>
+<div class="language-protobuf highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">message</span> <span class="nc">Example</span> <span class="p">{</span>
+  <span class="n">Features</span> <span class="na">features</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="kd">message</span> <span class="nc">Feature</span> <span class="p">{</span>
+  <span class="c1">// Each feature can be exactly one kind.</span>
+  <span class="k">oneof</span> <span class="n">kind</span> <span class="p">{</span>
+    <span class="n">BytesList</span> <span class="na">bytes_list</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="n">FloatList</span> <span class="na">float_list</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+    <span class="n">Int64List</span> <span class="na">int64_list</span> <span class="o">=</span> <span class="mi">3</span><span class="p">;</span>
+  <span class="p">}</span>
+<span class="p">};</span>
+
+<span class="kd">message</span> <span class="nc">Features</span> <span class="p">{</span>
+  <span class="c1">// Map from feature name to feature.</span>
+  <span class="n">map</span><span class="o">&lt;</span><span class="kt">string</span><span class="p">,</span> <span class="n">Feature</span><span class="err">&gt;</span> <span class="na">feature</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div></div>
+<p>可以看到，<code class="highlighter-rouge">TFRecord</code>里面其实是保存了key和value的，在sparse模型里，往往value较小，而key很大，这样就造成很大的浪费。可以考虑将key的长度进行压缩，减少单条样本的大小，提高样本读取速度从而加快训练速度。</p>
+
+  </div><a class="u-url" href="/dist-tf-for-sparse-models.html" hidden></a>
+</article>
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col">
+        <p class="feed-subscribe">
+          <a href="/feed.xml">
+            <svg class="svg-icon orange">
+              <use xlink:href="/assets/minima-social-icons.svg#rss"></use>
+            </svg><span>Subscribe</span>
+          </a>
+        </p>
+      </div>
+      <div class="footer-col">
+        <p>Chi&#39;s blog about ML, NLP, Programming and others.</p>
+      </div>
+    </div>
+
+    <div class="social-links"><ul class="social-media-list"><li><a rel="me" href="https://github.com/codescv" title="codescv"><svg class="svg-icon grey"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg></a></li><li><a rel="me" href="https://twitter.com/codescv" title="codescv"><svg class="svg-icon grey"><use xlink:href="/assets/minima-social-icons.svg#twitter"></use></svg></a></li></ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

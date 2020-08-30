@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="twitter:card" content="summary" /><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>ReactiveCocoa 代码阅读笔记 (1) 双向绑定 | Chi</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="ReactiveCocoa 代码阅读笔记 (1) 双向绑定" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="我们首先从一个双向绑定的例子开始。假设我们的UIViewController里有一个UITextField和一个UILabel， 我们希望在UITextField输入时， UILabel里面同步显示一样的内容。我们通过把UITextField和UILabel绑定到同一个model，也就是UIViewController的name属性上 来实现这一点。" />
+<meta property="og:description" content="我们首先从一个双向绑定的例子开始。假设我们的UIViewController里有一个UITextField和一个UILabel， 我们希望在UITextField输入时， UILabel里面同步显示一样的内容。我们通过把UITextField和UILabel绑定到同一个model，也就是UIViewController的name属性上 来实现这一点。" />
+<link rel="canonical" href="https://blog.codescv.com/ios/reactive-1.html" />
+<meta property="og:url" content="https://blog.codescv.com/ios/reactive-1.html" />
+<meta property="og:site_name" content="Chi" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2016-01-30T00:00:00-06:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.codescv.com/ios/reactive-1.html"},"description":"我们首先从一个双向绑定的例子开始。假设我们的UIViewController里有一个UITextField和一个UILabel， 我们希望在UITextField输入时， UILabel里面同步显示一样的内容。我们通过把UITextField和UILabel绑定到同一个model，也就是UIViewController的name属性上 来实现这一点。","@type":"BlogPosting","url":"https://blog.codescv.com/ios/reactive-1.html","headline":"ReactiveCocoa 代码阅读笔记 (1) 双向绑定","dateModified":"2016-01-30T00:00:00-06:00","datePublished":"2016-01-30T00:00:00-06:00","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="https://blog.codescv.com/feed.xml" title="Chi" /><link rel="shortcut icon" type="image/x-icon" href="/images/favicon.ico"><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>ReactiveCocoa 代码阅读笔记 (1) 双向绑定 | Chi</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="ReactiveCocoa 代码阅读笔记 (1) 双向绑定" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="我们首先从一个双向绑定的例子开始。假设我们的UIViewController里有一个UITextField和一个UILabel， 我们希望在UITextField输入时， UILabel里面同步显示一样的内容。我们通过把UITextField和UILabel绑定到同一个model，也就是UIViewController的name属性上 来实现这一点。" />
+<meta property="og:description" content="我们首先从一个双向绑定的例子开始。假设我们的UIViewController里有一个UITextField和一个UILabel， 我们希望在UITextField输入时， UILabel里面同步显示一样的内容。我们通过把UITextField和UILabel绑定到同一个model，也就是UIViewController的name属性上 来实现这一点。" />
+<link rel="canonical" href="https://blog.codescv.com/ios/reactive-1.html" />
+<meta property="og:url" content="https://blog.codescv.com/ios/reactive-1.html" />
+<meta property="og:site_name" content="Chi" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2016-01-30T00:00:00-06:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.codescv.com/ios/reactive-1.html"},"description":"我们首先从一个双向绑定的例子开始。假设我们的UIViewController里有一个UITextField和一个UILabel， 我们希望在UITextField输入时， UILabel里面同步显示一样的内容。我们通过把UITextField和UILabel绑定到同一个model，也就是UIViewController的name属性上 来实现这一点。","@type":"BlogPosting","url":"https://blog.codescv.com/ios/reactive-1.html","headline":"ReactiveCocoa 代码阅读笔记 (1) 双向绑定","dateModified":"2016-01-30T00:00:00-06:00","datePublished":"2016-01-30T00:00:00-06:00","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+<link href="https://unpkg.com/@primer/css/dist/primer.css" rel="stylesheet" />
+<link rel="stylesheet" href="//use.fontawesome.com/releases/v5.0.7/css/all.css"><link type="application/atom+xml" rel="alternate" href="https://blog.codescv.com/feed.xml" title="Chi" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.css" integrity="sha384-zB1R0rpPzHqg7Kpt0Aljp8JPLqbXI3bhnPWROx27a9N0Ll6ZP/+DiW/UqRcLbRjq" crossorigin="anonymous">
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"> </script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.js" integrity="sha384-y23I5Q6l+B6vatafAwxRu/0oK/79VlbSz7Q9aiSZUvyWYIYsd+qj+o24G5ZU2zJz" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous"></script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement( document.body, {
+        delimiters: [
+            {left: "$$", right: "$$", display: true},
+            {left: "[%", right: "%]", display: true},
+            {left: "$", right: "$", display: false}
+        ]}
+        );
+    });
+    </script>
+
+
+<script>
+function wrap_img(fn) {
+    if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
+        var elements = document.querySelectorAll(".post img");
+        Array.prototype.forEach.call(elements, function(el, i) {
+            if (el.getAttribute("title") && (el.className != "emoji")) {
+                const caption = document.createElement('figcaption');
+                var node = document.createTextNode(el.getAttribute("title"));
+                caption.appendChild(node);
+                const wrapper = document.createElement('figure');
+                wrapper.className = 'image';
+                el.parentNode.insertBefore(wrapper, el);
+                el.parentNode.removeChild(el);
+                wrapper.appendChild(el);
+                wrapper.appendChild(caption);
+            }
+        });
+    } else { document.addEventListener('DOMContentLoaded', fn); }
+}
+window.onload = wrap_img;
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+    // add link icon to anchor tags
+    var elem = document.querySelectorAll(".anchor-link")
+    elem.forEach(e => (e.innerHTML = '<i class="fas fa-link fa-xs"></i>'));
+    });
+</script>
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Chi</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About Me</a><a class="page-link" href="/search/">Search</a><a class="page-link" href="/categories/">Tags</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">ReactiveCocoa 代码阅读笔记 (1) 双向绑定</h1><p class="post-meta post-meta-title"><time class="dt-published" datetime="2016-01-30T00:00:00-06:00" itemprop="datePublished">
+        Jan 30, 2016
+      </time>
+       • <span class="read-time" title="Estimated read time">
+    
+    
+      2 min read
+    
+</span></p>
+
+    
+      <p class="category-tags"><i class="fas fa-tags category-tags-icon"></i></i> 
+      
+        <a class="category-tags-link" href="/categories/#iOS">iOS</a>
+        
+      
+      </p>
+    
+
+    </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <p>我们首先从一个双向绑定的例子开始。假设我们的<code class="highlighter-rouge">UIViewController</code>里有一个<code class="highlighter-rouge">UITextField</code>和一个<code class="highlighter-rouge">UILabel</code>， 我们希望在<code class="highlighter-rouge">UITextField</code>输入时，
+<code class="highlighter-rouge">UILabel</code>里面同步显示一样的内容。我们通过把<code class="highlighter-rouge">UITextField</code>和<code class="highlighter-rouge">UILabel</code>绑定到同一个<code class="highlighter-rouge">model</code>，也就是<code class="highlighter-rouge">UIViewController</code>的<code class="highlighter-rouge">name</code>属性上
+来实现这一点。</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"><span class="n">RAC</span><span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">nameTextfield</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span> <span class="o">=</span> <span class="n">RACObserve</span><span class="p">(</span><span class="n">self</span><span class="p">,</span> <span class="n">name</span><span class="p">);</span>
+<span class="n">RAC</span><span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">nameLabel</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span> <span class="o">=</span> <span class="n">RACObserve</span><span class="p">(</span><span class="n">self</span><span class="p">,</span> <span class="n">name</span><span class="p">);</span>
+    
+<span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">nameTextfield</span><span class="p">.</span><span class="n">rac_textSignal</span> <span class="nf">subscribeNext</span><span class="p">:</span><span class="o">^</span><span class="p">(</span><span class="n">id</span> <span class="n">x</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">x</span><span class="p">;</span>
+<span class="p">}];</span>
+<span class="c1">// this has the same effect as the above</span>
+<span class="c1">// RAC(self, name) = self.nameTextfield.rac_textSignal;</span></code></pre></figure>
+
+<p>当<code class="highlighter-rouge">model</code>变化时，<code class="highlighter-rouge">self.nameTextfield</code>和<code class="highlighter-rouge">self.nameLabel.text</code>都会随之变化。而当<code class="highlighter-rouge">UITextField</code>中的输入发生变化时，<code class="highlighter-rouge">model</code>也会发生变化。 <code class="highlighter-rouge">UITextField</code>和<code class="highlighter-rouge">model</code>发生了双向绑定，而<code class="highlighter-rouge">label</code>和<code class="highlighter-rouge">model</code>是单向绑定。</p>
+
+<p>我们把上面的代码用<code class="highlighter-rouge">clang -E</code>展开，看看到底发生了什么：</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"><span class="p">[[</span><span class="n">RACSubscriptingAssignmentTrampoline</span> <span class="nf">alloc</span><span class="p">]</span> <span class="nf">initWithTarget</span><span class="p">:(</span><span class="n">self</span><span class="p">.</span><span class="n">nameTextfield</span><span class="p">)</span> <span class="nf">nilValue</span><span class="p">:(((</span><span class="kt">void</span> <span class="o">*</span><span class="p">)</span><span class="mi">0</span><span class="p">))][</span><span class="err">@</span><span class="p">(((</span><span class="kt">void</span><span class="p">)(</span><span class="n">__objc_no</span> <span class="o">&amp;&amp;</span> <span class="p">((</span><span class="kt">void</span><span class="p">)</span><span class="n">self</span><span class="p">.</span><span class="n">nameTextfield</span><span class="p">.</span><span class="n">text</span><span class="p">,</span> <span class="n">__objc_no</span><span class="p">)),</span> <span class="s">"text"</span><span class="p">))]</span> <span class="o">=</span> <span class="p">({</span> <span class="n">__attribute__</span><span class="p">((</span><span class="n">objc_ownership</span><span class="p">(</span><span class="n">weak</span><span class="p">)))</span> <span class="n">id</span> <span class="n">target_</span> <span class="o">=</span> <span class="p">(</span><span class="n">self</span><span class="p">);</span> <span class="p">[</span><span class="n">target_</span> <span class="nf">rac_valuesForKeyPath</span><span class="p">:</span><span class="err">@</span><span class="p">(((</span><span class="kt">void</span><span class="p">)(</span><span class="n">__objc_no</span> <span class="o">&amp;&amp;</span> <span class="p">((</span><span class="kt">void</span><span class="p">)</span><span class="n">self</span><span class="p">.</span><span class="n">name</span><span class="p">,</span> <span class="n">__objc_no</span><span class="p">)),</span> <span class="s">"name"</span><span class="p">))</span> <span class="nf">observer</span><span class="p">:</span><span class="n">self</span><span class="p">];</span> <span class="p">});</span></code></pre></figure>
+
+<p>简化一下:</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"><span class="p">[[</span><span class="n">RACSubscriptingAssignmentTrampoline</span> <span class="nf">alloc</span><span class="p">]</span> <span class="nf">initWithTarget</span><span class="p">:(</span><span class="n">self</span><span class="p">.</span><span class="n">nameTextfield</span><span class="p">)</span> <span class="nf">nilValue</span><span class="p">:</span><span class="mi">0</span><span class="p">][</span><span class="s">@"text"</span><span class="p">]</span> <span class="o">=</span> <span class="p">({</span> <span class="n">__weak</span> <span class="n">id</span> <span class="n">target_</span> <span class="o">=</span> <span class="p">(</span><span class="n">self</span><span class="p">);</span> <span class="p">[</span><span class="n">target_</span> <span class="nf">rac_valuesForKeyPath</span><span class="p">:</span><span class="err">@</span><span class="p">(</span><span class="s">"name"</span><span class="p">)</span> <span class="nf">observer</span><span class="p">:</span><span class="n">self</span><span class="p">];</span> <span class="p">});</span></code></pre></figure>
+
+<p>等等，<code class="highlighter-rouge">@(((void)(__objc_no &amp;&amp; ((void)self.nameTextfield.text, __objc_no)), "text"))</code> 这个是什么东西？ 这个东西其实就等效于<code class="highlighter-rouge">@"text"</code>，但是为什么要前面这一长串呢？这是为了在编译期防止你引用了错误的属性，比如你写了<code class="highlighter-rouge">@RAC(self.nameTextField, somethingNotexist)</code>，编译器就会给出提示说这个属性不存在。clever.</p>
+
+<h2 id="rac">RAC</h2>
+
+<p>我们来看前半部分，也就是RAC的展开:</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"><span class="p">[[</span><span class="n">RACSubscriptingAssignmentTrampoline</span> <span class="nf">alloc</span><span class="p">]</span> <span class="nf">initWithTarget</span><span class="p">:(</span><span class="n">self</span><span class="p">.</span><span class="n">nameTextfield</span><span class="p">)</span> <span class="nf">nilValue</span><span class="p">:</span><span class="mi">0</span><span class="p">][</span><span class="s">@"text"</span><span class="p">]</span> <span class="o">=</span> <span class="p">...</span></code></pre></figure>
+
+<p>RAC宏第一个参数是target，也就是需要绑定的对象；第二个参数是keyPath, 也就是对象中需要绑定的属性名。RAC实际上是创建了一个RACSubscriptingAssignmentTrampoline对象，并调用其<code class="highlighter-rouge">setObject:forKeyedSubscript:</code>方法。</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"><span class="c1">// RACSubscriptingAssignmentTrampoline.m</span>
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">setObject</span><span class="p">:(</span><span class="n">RACSignal</span> <span class="o">*</span><span class="p">)</span><span class="nv">signal</span> <span class="nf">forKeyedSubscript</span><span class="p">:(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">keyPath</span> <span class="p">{</span>
+	<span class="p">[</span><span class="n">signal</span> <span class="nf">setKeyPath</span><span class="p">:</span><span class="n">keyPath</span> <span class="nf">onObject</span><span class="p">:</span><span class="n">self</span><span class="p">.</span><span class="n">target</span> <span class="n">nilValue</span><span class="o">:</span><span class="n">self</span><span class="p">.</span><span class="n">nilValue</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="c1">// RACSignal+Operations.m</span>
+<span class="k">-</span> <span class="p">(</span><span class="n">RACDisposable</span> <span class="o">*</span><span class="p">)</span><span class="nf">setKeyPath</span><span class="p">:(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">keyPath</span> <span class="nf">onObject</span><span class="p">:(</span><span class="n">NSObject</span> <span class="o">*</span><span class="p">)</span><span class="nv">object</span> <span class="nf">nilValue</span><span class="p">:(</span><span class="n">id</span><span class="p">)</span><span class="nv">nilValue</span> <span class="p">{</span>
+    <span class="c1">// ...</span>
+	<span class="n">RACDisposable</span> <span class="o">*</span><span class="n">subscriptionDisposable</span> <span class="o">=</span> <span class="p">[</span><span class="n">self</span> <span class="nf">subscribeNext</span><span class="p">:</span><span class="o">^</span><span class="p">(</span><span class="n">id</span> <span class="n">x</span><span class="p">)</span> <span class="p">{</span>
+		<span class="c1">// ...</span>
+		<span class="n">__strong</span> <span class="n">NSObject</span> <span class="o">*</span><span class="n">object</span> <span class="n">__attribute__</span><span class="p">((</span><span class="n">objc_precise_lifetime</span><span class="p">))</span> <span class="o">=</span> <span class="p">(</span><span class="n">__bridge</span> <span class="n">__strong</span> <span class="n">id</span><span class="p">)</span><span class="n">objectPtr</span><span class="p">;</span>
+		<span class="p">[</span><span class="n">object</span> <span class="nf">setValue</span><span class="p">:</span><span class="n">x</span> <span class="p">?:</span> <span class="n">nilValue</span> <span class="nf">forKeyPath</span><span class="p">:</span><span class="n">keyPath</span><span class="p">];</span>
+	<span class="p">}</span> <span class="nf">error</span><span class="p">:</span><span class="o">^</span><span class="p">(</span><span class="n">NSError</span> <span class="o">*</span><span class="n">error</span><span class="p">)</span> <span class="p">{</span>
+		<span class="c1">// ...</span>
+
+		<span class="p">[</span><span class="n">disposable</span> <span class="nf">dispose</span><span class="p">];</span>
+	<span class="p">}</span> <span class="n">completed</span><span class="o">:^</span><span class="p">{</span>
+		<span class="p">[</span><span class="n">disposable</span> <span class="nf">dispose</span><span class="p">];</span>
+	<span class="p">}];</span>
+	<span class="c1">// ...</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>可见RAC的下标set操作对右边的信号调用了subscribeNext, 并在所有的next event中通过<code class="highlighter-rouge">object setValue:forKeyPath</code>修改属性的值。在这个例子里，也就相当于<code class="highlighter-rouge">[self.nameTextField setValue:x forKeyPath: @"text"]</code></p>
+
+<h2 id="racobserve">RACObserve</h2>
+<p>RACObserve的展开:</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"> 
+<span class="p">({</span> <span class="n">__weak</span> <span class="n">id</span> <span class="n">target_</span> <span class="o">=</span> <span class="p">(</span><span class="n">self</span><span class="p">);</span> <span class="p">[</span><span class="n">target_</span> <span class="nf">rac_valuesForKeyPath</span><span class="p">:</span><span class="err">@</span><span class="p">(</span><span class="s">"name"</span><span class="p">)</span> <span class="nf">observer</span><span class="p">:</span><span class="n">self</span><span class="p">];</span> <span class="p">});</span></code></pre></figure>
+
+<p>rac_valuesForKeyPath:observer:调用了另一个方法:</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"> 
+<span class="c1">// NSObject+RACPropertySubscribing.m</span>
+<span class="k">-</span> <span class="p">(</span><span class="n">RACSignal</span> <span class="o">*</span><span class="p">)</span><span class="nf">rac_valuesAndChangesForKeyPath</span><span class="p">:(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">keyPath</span> <span class="nf">options</span><span class="p">:(</span><span class="n">NSKeyValueObservingOptions</span><span class="p">)</span><span class="nv">options</span> <span class="nf">observer</span><span class="p">:(</span><span class="n">__weak</span> <span class="n">NSObject</span> <span class="o">*</span><span class="p">)</span><span class="nv">weakObserver</span> <span class="p">{</span>
+	<span class="c1">// ...</span>
+	<span class="k">return</span> <span class="p">[[[</span><span class="n">RACSignal</span>
+		<span class="nl">createSignal:</span><span class="o">^</span> <span class="n">RACDisposable</span> <span class="o">*</span> <span class="p">(</span><span class="n">id</span><span class="o">&lt;</span><span class="n">RACSubscriber</span><span class="o">&gt;</span> <span class="n">subscriber</span><span class="p">)</span> <span class="p">{</span>
+			<span class="c1">//...</span>
+
+			<span class="k">return</span> <span class="p">[</span><span class="n">self</span> <span class="nf">rac_observeKeyPath</span><span class="p">:</span><span class="n">keyPath</span> <span class="nf">options</span><span class="p">:</span><span class="n">options</span> <span class="nf">observer</span><span class="p">:</span><span class="n">observer</span> <span class="nf">block</span><span class="p">:</span><span class="o">^</span><span class="p">(</span><span class="n">id</span> <span class="n">value</span><span class="p">,</span> <span class="n">NSDictionary</span> <span class="o">*</span><span class="n">change</span><span class="p">,</span> <span class="n">BOOL</span> <span class="n">causedByDealloc</span><span class="p">,</span> <span class="n">BOOL</span> <span class="n">affectedOnlyLastComponent</span><span class="p">)</span> <span class="p">{</span>
+				<span class="p">[</span><span class="n">subscriber</span> <span class="nf">sendNext</span><span class="p">:</span><span class="n">RACTuplePack</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">change</span><span class="p">)];</span>
+			<span class="p">}];</span>
+		<span class="err">}</span><span class="p">]</span>
+		<span class="n">takeUntil</span><span class="o">:</span><span class="n">deallocSignal</span><span class="p">]</span>
+		<span class="n">setNameWithFormat</span><span class="o">:</span><span class="s">@"%@ -rac_valueAndChangesForKeyPath: %@ options: %lu observer: %@"</span><span class="p">,</span> <span class="n">self</span><span class="p">.</span><span class="n">rac_description</span><span class="p">,</span> <span class="n">keyPath</span><span class="p">,</span> <span class="p">(</span><span class="kt">unsigned</span> <span class="kt">long</span><span class="p">)</span><span class="n">options</span><span class="p">,</span> <span class="n">strongObserver</span><span class="p">.</span><span class="n">rac_description</span><span class="p">];</span>
+	<span class="c1">// ...</span>
+<span class="err">}</span></code></pre></figure>
+
+<p>这个方法创建了一个RACSignal, 这个Signal在keypath发生变化时会发出“通知”.
+这个Signal由RACKVOTrampoline实现，RACKVOTrampoline封装了KVO，将在keypath发生变化时发送信号。</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"> 
+<span class="c1">// NSObject+RACKVOWrapper.m</span>
+<span class="k">-</span> <span class="p">(</span><span class="n">RACDisposable</span> <span class="o">*</span><span class="p">)</span><span class="nf">rac_observeKeyPath</span><span class="p">:(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">keyPath</span> <span class="nf">options</span><span class="p">:(</span><span class="n">NSKeyValueObservingOptions</span><span class="p">)</span><span class="nv">options</span> <span class="nf">observer</span><span class="p">:(</span><span class="n">__weak</span> <span class="n">NSObject</span> <span class="o">*</span><span class="p">)</span><span class="nv">weakObserver</span> <span class="nf">block</span><span class="p">:(</span><span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">id</span><span class="p">,</span> <span class="n">NSDictionary</span> <span class="o">*</span><span class="p">,</span> <span class="n">BOOL</span><span class="p">,</span> <span class="n">BOOL</span><span class="p">))</span><span class="nv">block</span> <span class="p">{</span>
+	<span class="c1">// ...</span>
+	<span class="n">RACKVOTrampoline</span> <span class="o">*</span><span class="n">trampoline</span> <span class="o">=</span> <span class="p">[[</span><span class="n">RACKVOTrampoline</span> <span class="nf">alloc</span><span class="p">]</span> <span class="nf">initWithTarget</span><span class="p">:</span><span class="n">self</span> <span class="nf">observer</span><span class="p">:</span><span class="n">strongObserver</span> <span class="n">keyPath</span><span class="o">:</span><span class="n">keyPathHead</span> <span class="n">options</span><span class="o">:</span><span class="n">trampolineOptions</span> <span class="n">block</span><span class="o">:^</span><span class="p">(</span><span class="n">id</span> <span class="n">trampolineTarget</span><span class="p">,</span> <span class="n">id</span> <span class="n">trampolineObserver</span><span class="p">,</span> <span class="n">NSDictionary</span> <span class="o">*</span><span class="n">change</span><span class="p">)</span> <span class="p">{</span>
+		<span class="c1">// ... 当KVO发生后进入这里，这里会调用前面传入的block</span>
+	<span class="p">}</span>
+
+<span class="p">}</span></code></pre></figure>
+
+<h2 id="rac_textsignal">rac_textSignal</h2>
+
+<p>知道了<code class="highlighter-rouge">RAC</code>和<code class="highlighter-rouge">RACObserve</code>，接下来我们来看<code class="highlighter-rouge">rac_textSignal</code>的实现：</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"><span class="c1">// UITextField+RACSignalSupport.m</span>
+<span class="k">-</span> <span class="p">(</span><span class="n">RACSignal</span> <span class="o">*</span><span class="p">)</span><span class="n">rac_textSignal</span> <span class="p">{</span>
+	<span class="err">@weakify</span><span class="p">(</span><span class="n">self</span><span class="p">);</span>
+	<span class="k">return</span> <span class="p">[[[[[</span><span class="n">RACSignal</span>
+		<span class="nl">defer:</span><span class="o">^</span><span class="p">{</span>
+			<span class="err">@strongify</span><span class="p">(</span><span class="n">self</span><span class="p">)</span><span class="err">;</span>
+			<span class="k">return</span> <span class="p">[</span><span class="n">RACSignal</span> <span class="nf">return</span><span class="p">:</span><span class="n">self</span><span class="p">]</span><span class="err">;</span>
+		<span class="err">}</span><span class="p">]</span>
+		<span class="nl">concat:</span><span class="p">[</span><span class="n">self</span> <span class="nf">rac_signalForControlEvents</span><span class="p">:</span><span class="n">UIControlEventEditingChanged</span> <span class="o">|</span> <span class="n">UIControlEventEditingDidBegin</span><span class="p">]]</span>
+		<span class="nl">map:</span><span class="o">^</span><span class="p">(</span><span class="n">UITextField</span> <span class="o">*</span><span class="n">x</span><span class="p">)</span> <span class="p">{</span>
+			<span class="k">return</span> <span class="n">x</span><span class="p">.</span><span class="n">text</span><span class="err">;</span>
+		<span class="err">}</span><span class="p">]</span>
+		<span class="nl">takeUntil:</span><span class="n">self</span><span class="p">.</span><span class="n">rac_willDeallocSignal</span><span class="p">]</span>
+		<span class="nl">setNameWithFormat:</span><span class="s">@"%@ -rac_textSignal"</span><span class="p">,</span> <span class="n">self</span><span class="p">.</span><span class="n">rac_description</span><span class="p">];</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>可见rac_textSignal监控UIControlEventEditingChanged | UIControlEventEditingDidBegin事件，subscriber将获得textfield.text</p>
+
+<h2 id="weakify-和strongify">weakify 和strongify</h2>
+<p>RAC中常见的<code class="highlighter-rouge">@weakify</code> 和 <code class="highlighter-rouge">@strongify</code>展开如下：</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"><span class="err">@weakify</span>
+<span class="k">@autoreleasepool</span> <span class="p">{}</span> <span class="n">__attribute__</span><span class="p">((</span><span class="n">objc_gc</span><span class="p">(</span><span class="n">weak</span><span class="p">)))</span> <span class="n">__typeof__</span><span class="p">(</span><span class="n">self</span><span class="p">)</span> <span class="n">self_weak_</span> <span class="o">=</span> <span class="p">(</span><span class="n">self</span><span class="p">);;</span>
+
+<span class="err">@strongify</span>
+<span class="n">__typeof__</span><span class="p">(</span><span class="n">self</span><span class="p">)</span> <span class="n">self</span> <span class="o">=</span> <span class="n">self_weak_</span><span class="p">;</span></code></pre></figure>
+
+<p>为了看起来美观，用了一个<code class="highlighter-rouge">autoreleasepool</code>的hack，使得宏的前面可以用<code class="highlighter-rouge">@</code>，有点意思。</p>
+
+<h2 id="textview">textView</h2>
+<p>前面<code class="highlighter-rouge">Textfield</code>的<code class="highlighter-rouge">rac_textSignal</code>使用监控control events的方式来获取变化。但是<code class="highlighter-rouge">UITextView</code>并没有这些event。所以RAC使用了delegate的方式来实现<code class="highlighter-rouge">UITextview</code>的<code class="highlighter-rouge">rac_textSignal</code>。但是又有一个问题：如果想同时使用delegate怎么办呢？</p>
+
+<h3 id="delegate-forwardinvocation">delegate forwardInvocation</h3>
+<p>RACDelegateProxy会用forwardInvocation的方式发送给self.delegate
+所以如果需要同时使用，先设置delegate,再使用rac_textSignal即可。</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"><span class="c1">// UITextView+RACSignalSupport.m</span>
+<span class="k">-</span> <span class="p">(</span><span class="n">RACSignal</span> <span class="o">*</span><span class="p">)</span><span class="n">rac_textSignal</span> <span class="p">{</span>
+	<span class="err">@weakify</span><span class="p">(</span><span class="n">self</span><span class="p">);</span>
+	<span class="n">RACSignal</span> <span class="o">*</span><span class="n">signal</span> <span class="o">=</span> <span class="p">[[[[[</span><span class="n">RACSignal</span>
+		<span class="nl">defer:</span><span class="o">^</span><span class="p">{</span>
+			<span class="err">@strongify</span><span class="p">(</span><span class="n">self</span><span class="p">)</span><span class="err">;</span>
+			<span class="k">return</span> <span class="p">[</span><span class="n">RACSignal</span> <span class="nf">return</span><span class="p">:</span><span class="n">RACTuplePack</span><span class="p">(</span><span class="n">self</span><span class="p">)]</span><span class="err">;</span>
+		<span class="err">}</span><span class="p">]</span>
+		<span class="nl">concat:</span><span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">rac_delegateProxy</span> <span class="nf">signalForSelector</span><span class="p">:</span><span class="k">@selector</span><span class="p">(</span><span class="nf">textViewDidChange</span><span class="p">:)]]</span>
+		<span class="nl">reduceEach:</span><span class="o">^</span><span class="p">(</span><span class="n">UITextView</span> <span class="o">*</span><span class="n">x</span><span class="p">)</span> <span class="p">{</span>
+			<span class="k">return</span> <span class="n">x</span><span class="p">.</span><span class="n">text</span><span class="p">;</span>
+		<span class="p">}]</span>
+		<span class="n">takeUntil</span><span class="o">:</span><span class="n">self</span><span class="p">.</span><span class="n">rac_willDeallocSignal</span><span class="p">]</span>
+		<span class="n">setNameWithFormat</span><span class="o">:</span><span class="s">@"%@ -rac_textSignal"</span><span class="p">,</span> <span class="n">self</span><span class="p">.</span><span class="n">rac_description</span><span class="p">];</span>
+
+	<span class="n">RACUseDelegateProxy</span><span class="p">(</span><span class="n">self</span><span class="p">);</span>
+
+	<span class="k">return</span> <span class="n">signal</span><span class="p">;</span>
+<span class="err">}</span></code></pre></figure>
+
+<p><code class="highlighter-rouge">signalForSelector</code>是RAC中一个重要的方法，它的作用简单来说就是勾住一个方法，当这个方法被调用时把所有的参数放在一个tuple里，当做信号发出来。因此，<code class="highlighter-rouge">RACUseDelegateProxy(self)</code>把<code class="highlighter-rouge">UITextView</code>的<code class="highlighter-rouge">delegate</code>指向<code class="highlighter-rouge">RACDelegateProxy</code>，而<code class="highlighter-rouge">RACDelegateProxy signalForSelector:@selector(textViewDidChange:)</code>就可以捕捉所有原本调用<code class="highlighter-rouge">delegate</code>的方法，并发出<code class="highlighter-rouge">textView</code>实例作为信号，并在<code class="highlighter-rouge">reduceEach</code>中获得其<code class="highlighter-rouge">text</code>属性。</p>
+
+<h1 id="参考">参考</h1>
+
+<p>关于ReactiveCocoa:</p>
+
+<p><a href="http://cocoasamurai.blogspot.jp/2013/03/basic-mvvm-with-reactivecocoa.html">http://cocoasamurai.blogspot.jp/2013/03/basic-mvvm-with-reactivecocoa.html</a></p>
+
+<p><a href="http://www.raywenderlich.com/62699/reactivecocoa-tutorial-pt1">http://www.raywenderlich.com/62699/reactivecocoa-tutorial-pt1</a></p>
+
+  </div><a class="u-url" href="/ios/reactive-1.html" hidden></a>
+</article>
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col">
+        <p class="feed-subscribe">
+          <a href="/feed.xml">
+            <svg class="svg-icon orange">
+              <use xlink:href="/assets/minima-social-icons.svg#rss"></use>
+            </svg><span>Subscribe</span>
+          </a>
+        </p>
+      </div>
+      <div class="footer-col">
+        <p>Chi&#39;s blog about ML, NLP, Programming and others.</p>
+      </div>
+    </div>
+
+    <div class="social-links"><ul class="social-media-list"><li><a rel="me" href="https://github.com/codescv" title="codescv"><svg class="svg-icon grey"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg></a></li><li><a rel="me" href="https://twitter.com/codescv" title="codescv"><svg class="svg-icon grey"><use xlink:href="/assets/minima-social-icons.svg#twitter"></use></svg></a></li></ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

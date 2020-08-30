@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="twitter:card" content="summary" /><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>ReactiveCocoa 代码阅读笔记 (2) Signal的实现机制 | Chi</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="ReactiveCocoa 代码阅读笔记 (2) Signal的实现机制" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="上篇讲了RAC和RACObserve两个宏的实现机制，但都是把RACSignal当作一个黑盒来理解。 本篇详细讲解Signal的内部机制。" />
+<meta property="og:description" content="上篇讲了RAC和RACObserve两个宏的实现机制，但都是把RACSignal当作一个黑盒来理解。 本篇详细讲解Signal的内部机制。" />
+<link rel="canonical" href="https://blog.codescv.com/ios/reactive-2.html" />
+<meta property="og:url" content="https://blog.codescv.com/ios/reactive-2.html" />
+<meta property="og:site_name" content="Chi" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2016-02-07T00:00:00-06:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.codescv.com/ios/reactive-2.html"},"description":"上篇讲了RAC和RACObserve两个宏的实现机制，但都是把RACSignal当作一个黑盒来理解。 本篇详细讲解Signal的内部机制。","@type":"BlogPosting","url":"https://blog.codescv.com/ios/reactive-2.html","headline":"ReactiveCocoa 代码阅读笔记 (2) Signal的实现机制","dateModified":"2016-02-07T00:00:00-06:00","datePublished":"2016-02-07T00:00:00-06:00","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="https://blog.codescv.com/feed.xml" title="Chi" /><link rel="shortcut icon" type="image/x-icon" href="/images/favicon.ico"><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>ReactiveCocoa 代码阅读笔记 (2) Signal的实现机制 | Chi</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="ReactiveCocoa 代码阅读笔记 (2) Signal的实现机制" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="上篇讲了RAC和RACObserve两个宏的实现机制，但都是把RACSignal当作一个黑盒来理解。 本篇详细讲解Signal的内部机制。" />
+<meta property="og:description" content="上篇讲了RAC和RACObserve两个宏的实现机制，但都是把RACSignal当作一个黑盒来理解。 本篇详细讲解Signal的内部机制。" />
+<link rel="canonical" href="https://blog.codescv.com/ios/reactive-2.html" />
+<meta property="og:url" content="https://blog.codescv.com/ios/reactive-2.html" />
+<meta property="og:site_name" content="Chi" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2016-02-07T00:00:00-06:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.codescv.com/ios/reactive-2.html"},"description":"上篇讲了RAC和RACObserve两个宏的实现机制，但都是把RACSignal当作一个黑盒来理解。 本篇详细讲解Signal的内部机制。","@type":"BlogPosting","url":"https://blog.codescv.com/ios/reactive-2.html","headline":"ReactiveCocoa 代码阅读笔记 (2) Signal的实现机制","dateModified":"2016-02-07T00:00:00-06:00","datePublished":"2016-02-07T00:00:00-06:00","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+<link href="https://unpkg.com/@primer/css/dist/primer.css" rel="stylesheet" />
+<link rel="stylesheet" href="//use.fontawesome.com/releases/v5.0.7/css/all.css"><link type="application/atom+xml" rel="alternate" href="https://blog.codescv.com/feed.xml" title="Chi" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.css" integrity="sha384-zB1R0rpPzHqg7Kpt0Aljp8JPLqbXI3bhnPWROx27a9N0Ll6ZP/+DiW/UqRcLbRjq" crossorigin="anonymous">
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"> </script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.js" integrity="sha384-y23I5Q6l+B6vatafAwxRu/0oK/79VlbSz7Q9aiSZUvyWYIYsd+qj+o24G5ZU2zJz" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous"></script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement( document.body, {
+        delimiters: [
+            {left: "$$", right: "$$", display: true},
+            {left: "[%", right: "%]", display: true},
+            {left: "$", right: "$", display: false}
+        ]}
+        );
+    });
+    </script>
+
+
+<script>
+function wrap_img(fn) {
+    if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
+        var elements = document.querySelectorAll(".post img");
+        Array.prototype.forEach.call(elements, function(el, i) {
+            if (el.getAttribute("title") && (el.className != "emoji")) {
+                const caption = document.createElement('figcaption');
+                var node = document.createTextNode(el.getAttribute("title"));
+                caption.appendChild(node);
+                const wrapper = document.createElement('figure');
+                wrapper.className = 'image';
+                el.parentNode.insertBefore(wrapper, el);
+                el.parentNode.removeChild(el);
+                wrapper.appendChild(el);
+                wrapper.appendChild(caption);
+            }
+        });
+    } else { document.addEventListener('DOMContentLoaded', fn); }
+}
+window.onload = wrap_img;
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+    // add link icon to anchor tags
+    var elem = document.querySelectorAll(".anchor-link")
+    elem.forEach(e => (e.innerHTML = '<i class="fas fa-link fa-xs"></i>'));
+    });
+</script>
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Chi</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About Me</a><a class="page-link" href="/search/">Search</a><a class="page-link" href="/categories/">Tags</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">ReactiveCocoa 代码阅读笔记 (2) Signal的实现机制</h1><p class="post-meta post-meta-title"><time class="dt-published" datetime="2016-02-07T00:00:00-06:00" itemprop="datePublished">
+        Feb 7, 2016
+      </time>
+       • <span class="read-time" title="Estimated read time">
+    
+    
+      1 min read
+    
+</span></p>
+
+    
+      <p class="category-tags"><i class="fas fa-tags category-tags-icon"></i></i> 
+      
+        <a class="category-tags-link" href="/categories/#iOS">iOS</a>
+        
+      
+      </p>
+    
+
+    </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <p>上篇讲了RAC和RACObserve两个宏的实现机制，但都是把RACSignal当作一个黑盒来理解。
+本篇详细讲解Signal的内部机制。</p>
+
+<h2 id="创建signal">创建Signal</h2>
+
+<p>Signal有很多种创建方式，例如<code class="highlighter-rouge">[UITextView rac_textSignal]</code>是用<code class="highlighter-rouge">signalForSelector:</code>的方式。这里我们先看看
+自定义创建的Signal:</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"><span class="c1">// RACSignal.m</span>
+<span class="k">+</span> <span class="p">(</span><span class="n">RACSignal</span> <span class="o">*</span><span class="p">)</span><span class="nf">createSignal</span><span class="p">:(</span><span class="n">RACDisposable</span> <span class="o">*</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">id</span><span class="o">&lt;</span><span class="n">RACSubscriber</span><span class="o">&gt;</span> <span class="n">subscriber</span><span class="p">))</span><span class="nv">didSubscribe</span> <span class="p">{</span>
+	<span class="k">return</span> <span class="p">[</span><span class="n">RACDynamicSignal</span> <span class="nf">createSignal</span><span class="p">:</span><span class="n">didSubscribe</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="c1">// RACDynamicSignal.m</span>
+<span class="k">+</span> <span class="p">(</span><span class="n">RACSignal</span> <span class="o">*</span><span class="p">)</span><span class="nf">createSignal</span><span class="p">:(</span><span class="n">RACDisposable</span> <span class="o">*</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">id</span><span class="o">&lt;</span><span class="n">RACSubscriber</span><span class="o">&gt;</span> <span class="n">subscriber</span><span class="p">))</span><span class="nv">didSubscribe</span> <span class="p">{</span>
+	<span class="n">RACDynamicSignal</span> <span class="o">*</span><span class="n">signal</span> <span class="o">=</span> <span class="p">[[</span><span class="n">self</span> <span class="nf">alloc</span><span class="p">]</span> <span class="nf">init</span><span class="p">];</span>
+	<span class="n">signal</span><span class="o">-&gt;</span><span class="n">_didSubscribe</span> <span class="o">=</span> <span class="p">[</span><span class="n">didSubscribe</span> <span class="nf">copy</span><span class="p">];</span>
+	<span class="k">return</span> <span class="p">[</span><span class="n">signal</span> <span class="nf">setNameWithFormat</span><span class="p">:</span><span class="s">@"+createSignal:"</span><span class="p">];</span>
+<span class="p">}</span></code></pre></figure>
+
+<p><code class="highlighter-rouge">createSignal</code>方法接收一个block, 把这个block存在<code class="highlighter-rouge">_didSubscribe</code>属性中。顾名思义，这个block会在<code class="highlighter-rouge">subscribe</code>的时候被调用。</p>
+
+<h2 id="subscribe一个signal">subscribe一个signal</h2>
+<p>下面看最常用的<code class="highlighter-rouge">subscribeNext</code>的定义</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"><span class="c1">// RACSignal.m</span>
+<span class="k">-</span> <span class="p">(</span><span class="n">RACDisposable</span> <span class="o">*</span><span class="p">)</span><span class="nf">subscribeNext</span><span class="p">:(</span><span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">id</span> <span class="n">x</span><span class="p">))</span><span class="nv">nextBlock</span> <span class="nf">error</span><span class="p">:(</span><span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="n">NSError</span> <span class="o">*</span><span class="n">error</span><span class="p">))</span><span class="nv">errorBlock</span> <span class="nf">completed</span><span class="p">:(</span><span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="kt">void</span><span class="p">))</span><span class="nv">completedBlock</span> <span class="p">{</span>
+	<span class="n">RACSubscriber</span> <span class="o">*</span><span class="n">o</span> <span class="o">=</span> <span class="p">[</span><span class="n">RACSubscriber</span> <span class="nf">subscriberWithNext</span><span class="p">:</span><span class="n">nextBlock</span> <span class="nf">error</span><span class="p">:</span><span class="n">errorBlock</span> <span class="n">completed</span><span class="o">:</span><span class="n">completedBlock</span><span class="p">];</span>
+	<span class="k">return</span> <span class="p">[</span><span class="n">self</span> <span class="nf">subscribe</span><span class="p">:</span><span class="n">o</span><span class="p">];</span>
+<span class="p">}</span></code></pre></figure>
+
+<p><code class="highlighter-rouge">subscribeNext</code>会创建一个<code class="highlighter-rouge">RACSubscriber</code>对象， 它保存了<code class="highlighter-rouge">nextBlock</code>, <code class="highlighter-rouge">errorBlock</code>和<code class="highlighter-rouge">completedBlock</code>，这些block将在<code class="highlighter-rouge">sendNext</code>, <code class="highlighter-rouge">sendError</code>和<code class="highlighter-rouge">sendCompleted</code>时调用:</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"><span class="c1">// RACSubscriber.m</span>
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">sendNext</span><span class="p">:(</span><span class="n">id</span><span class="p">)</span><span class="nv">value</span> <span class="p">{</span>
+	<span class="k">@synchronized</span> <span class="p">(</span><span class="n">self</span><span class="p">)</span> <span class="p">{</span>
+		<span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="n">nextBlock</span><span class="p">)(</span><span class="n">id</span><span class="p">)</span> <span class="o">=</span> <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">next</span> <span class="nf">copy</span><span class="p">];</span>
+		<span class="k">if</span> <span class="p">(</span><span class="n">nextBlock</span> <span class="o">==</span> <span class="nb">nil</span><span class="p">)</span> <span class="k">return</span><span class="p">;</span>
+
+		<span class="n">nextBlock</span><span class="p">(</span><span class="n">value</span><span class="p">);</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">sendError</span><span class="p">:(</span><span class="n">NSError</span> <span class="o">*</span><span class="p">)</span><span class="nv">e</span> <span class="p">{</span>
+	<span class="k">@synchronized</span> <span class="p">(</span><span class="n">self</span><span class="p">)</span> <span class="p">{</span>
+		<span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="n">errorBlock</span><span class="p">)(</span><span class="n">NSError</span> <span class="o">*</span><span class="p">)</span> <span class="o">=</span> <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">error</span> <span class="nf">copy</span><span class="p">];</span>
+		<span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">disposable</span> <span class="nf">dispose</span><span class="p">];</span>
+
+		<span class="k">if</span> <span class="p">(</span><span class="n">errorBlock</span> <span class="o">==</span> <span class="nb">nil</span><span class="p">)</span> <span class="k">return</span><span class="p">;</span>
+		<span class="n">errorBlock</span><span class="p">(</span><span class="n">e</span><span class="p">);</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">sendCompleted</span> <span class="p">{</span>
+	<span class="k">@synchronized</span> <span class="p">(</span><span class="n">self</span><span class="p">)</span> <span class="p">{</span>
+		<span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="n">completedBlock</span><span class="p">)(</span><span class="kt">void</span><span class="p">)</span> <span class="o">=</span> <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">completed</span> <span class="nf">copy</span><span class="p">];</span>
+		<span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">disposable</span> <span class="nf">dispose</span><span class="p">];</span>
+
+		<span class="k">if</span> <span class="p">(</span><span class="n">completedBlock</span> <span class="o">==</span> <span class="nb">nil</span><span class="p">)</span> <span class="k">return</span><span class="p">;</span>
+		<span class="n">completedBlock</span><span class="p">();</span>
+	<span class="p">}</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>可以看到, <code class="highlighter-rouge">sendNext</code>是线程安全的，并且<code class="highlighter-rouge">nextBlock</code>是和<code class="highlighter-rouge">sendNext</code>在同一个线程上执行的。</p>
+
+<p>我们回到<code class="highlighter-rouge">RACSignal</code>, <code class="highlighter-rouge">subscribeNext</code>会调用<code class="highlighter-rouge">subscribe</code>:</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"><span class="c1">// RACDynamicSignal.m</span>
+<span class="k">-</span> <span class="p">(</span><span class="n">RACDisposable</span> <span class="o">*</span><span class="p">)</span><span class="nf">subscribe</span><span class="p">:(</span><span class="n">id</span><span class="o">&lt;</span><span class="n">RACSubscriber</span><span class="o">&gt;</span><span class="p">)</span><span class="nv">subscriber</span> <span class="p">{</span>
+	<span class="n">NSCParameterAssert</span><span class="p">(</span><span class="n">subscriber</span> <span class="o">!=</span> <span class="nb">nil</span><span class="p">);</span>
+
+	<span class="n">RACCompoundDisposable</span> <span class="o">*</span><span class="n">disposable</span> <span class="o">=</span> <span class="p">[</span><span class="n">RACCompoundDisposable</span> <span class="nf">compoundDisposable</span><span class="p">];</span>
+	<span class="n">subscriber</span> <span class="o">=</span> <span class="p">[[</span><span class="n">RACPassthroughSubscriber</span> <span class="nf">alloc</span><span class="p">]</span> <span class="nf">initWithSubscriber</span><span class="p">:</span><span class="n">subscriber</span> <span class="nf">signal</span><span class="p">:</span><span class="n">self</span> <span class="n">disposable</span><span class="o">:</span><span class="n">disposable</span><span class="p">];</span>
+
+	<span class="k">if</span> <span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">didSubscribe</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+		<span class="n">RACDisposable</span> <span class="o">*</span><span class="n">schedulingDisposable</span> <span class="o">=</span> <span class="p">[</span><span class="n">RACScheduler</span><span class="p">.</span><span class="n">subscriptionScheduler</span> <span class="nf">schedule</span><span class="p">:</span><span class="o">^</span><span class="p">{</span>
+			<span class="n">RACDisposable</span> <span class="o">*</span><span class="n">innerDisposable</span> <span class="o">=</span> <span class="n">self</span><span class="p">.</span><span class="n">didSubscribe</span><span class="p">(</span><span class="n">subscriber</span><span class="p">);</span>
+			<span class="p">[</span><span class="n">disposable</span> <span class="nf">addDisposable</span><span class="p">:</span><span class="n">innerDisposable</span><span class="p">];</span>
+		<span class="p">}];</span>
+
+		<span class="p">[</span><span class="n">disposable</span> <span class="nf">addDisposable</span><span class="p">:</span><span class="n">schedulingDisposable</span><span class="p">];</span>
+	<span class="p">}</span>
+	
+	<span class="k">return</span> <span class="n">disposable</span><span class="p">;</span>
+<span class="p">}</span></code></pre></figure>
+
+<p><code class="highlighter-rouge">RACPassthroughSubscriber</code>可以看作和<code class="highlighter-rouge">subscriber</code>功能一样，这里不细讲，所以<code class="highlighter-rouge">subscribe:</code>就是调用了<code class="highlighter-rouge">RACScheduler.subscriptionScheduler schedule:</code> 并传入一个block, 在这个block中调用了<code class="highlighter-rouge">didSubscribe</code>，也就是<code class="highlighter-rouge">createSignal</code>中的block。所以我们可以得到一个结论：对于<code class="highlighter-rouge">createSignal</code>创建的信号，每<code class="highlighter-rouge">subscribe</code>一次，其block就被调用一次。</p>
+
+<p><code class="highlighter-rouge">RACScheduler.subscriptionScheduler</code>返回一个单例的<code class="highlighter-rouge">RACSubscriptionScheduler</code>对象, 其<code class="highlighter-rouge">schedule</code>方法:</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"><span class="c1">// RACSubscriptionScheduler.m</span>
+<span class="k">-</span> <span class="p">(</span><span class="n">RACDisposable</span> <span class="o">*</span><span class="p">)</span><span class="nf">schedule</span><span class="p">:(</span><span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="p">)(</span><span class="kt">void</span><span class="p">))</span><span class="nv">block</span> <span class="p">{</span>
+	<span class="n">NSCParameterAssert</span><span class="p">(</span><span class="n">block</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">);</span>
+
+	<span class="k">if</span> <span class="p">(</span><span class="n">RACScheduler</span><span class="p">.</span><span class="n">currentScheduler</span> <span class="o">==</span> <span class="nb">nil</span><span class="p">)</span> <span class="k">return</span> <span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">backgroundScheduler</span> <span class="nf">schedule</span><span class="p">:</span><span class="n">block</span><span class="p">];</span>
+
+	<span class="n">block</span><span class="p">();</span>
+	<span class="k">return</span> <span class="nb">nil</span><span class="p">;</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>这个方法会找<code class="highlighter-rouge">RACScheduler.currentScheduler</code>, 这个方法在主线程上或者在<code class="highlighter-rouge">schedule</code>内部(schedule中的schedule)会返回非<code class="highlighter-rouge">nil</code>, 此时直接调用block; 如果不在主线程上，最外层schedule会使用<code class="highlighter-rouge">backgroundScheduler</code>，也就是在一个background queue上执行block.</p>
+
+<p>因此, 如果createSignal在主线程上执行，(之后调用subscribe时)signal的<code class="highlighter-rouge">didSubscribe</code>(也就是<code class="highlighter-rouge">createSignal</code>传入的block)也会在主线程上执行。</p>
+
+<p>一般自定义的signal会在<code class="highlighter-rouge">didSubscribe</code>这个block中(或者其后续)调用<code class="highlighter-rouge">[subscriber sendNext]</code>等方法，这样<code class="highlighter-rouge">subscribeNext:</code>中传入的block就会执行。应该注意到的是<code class="highlighter-rouge">subscirbeNext:</code>中传入的block会和<code class="highlighter-rouge">sendNext</code>在同一个线程上执行。</p>
+
+<h1 id="rac_signalforselector">rac_signalForSelector:</h1>
+<p><code class="highlighter-rouge">rac_signalForSelector: </code>这个方法很重要，它为各种<code class="highlighter-rouge">UIView</code>的delegate方法封装提供了基础。这个方法产生一个signal, 这个signal会在receiver执行某个selector时发送函数调用的参数。以UITextView为例:</p>
+
+<figure class="highlight"><pre><code class="language-objc" data-lang="objc"><span class="c1">// NSObject+RACSelectorSignal</span>
+<span class="k">-</span> <span class="p">(</span><span class="n">RACSignal</span> <span class="o">*</span><span class="p">)</span><span class="nf">rac_signalForSelector</span><span class="p">:(</span><span class="n">SEL</span><span class="p">)</span><span class="nv">selector</span><span class="p">;</span>
+
+<span class="c1">// UITextView+RACSignalSupport.m</span>
+<span class="k">-</span> <span class="p">(</span><span class="n">RACSignal</span> <span class="o">*</span><span class="p">)</span><span class="n">rac_textSignal</span> <span class="p">{</span>
+	<span class="err">@weakify</span><span class="p">(</span><span class="n">self</span><span class="p">);</span>
+	<span class="n">RACSignal</span> <span class="o">*</span><span class="n">signal</span> <span class="o">=</span> <span class="p">[[[[[</span><span class="n">RACSignal</span>
+		<span class="nl">defer:</span><span class="o">^</span><span class="p">{</span>
+			<span class="err">@strongify</span><span class="p">(</span><span class="n">self</span><span class="p">)</span><span class="err">;</span>
+			<span class="k">return</span> <span class="p">[</span><span class="n">RACSignal</span> <span class="nf">return</span><span class="p">:</span><span class="n">RACTuplePack</span><span class="p">(</span><span class="n">self</span><span class="p">)]</span><span class="err">;</span>
+		<span class="err">}</span><span class="p">]</span>
+		<span class="nl">concat:</span><span class="p">[</span><span class="n">self</span><span class="p">.</span><span class="n">rac_delegateProxy</span> <span class="nf">signalForSelector</span><span class="p">:</span><span class="k">@selector</span><span class="p">(</span><span class="nf">textViewDidChange</span><span class="p">:)]]</span>
+		<span class="nl">reduceEach:</span><span class="o">^</span><span class="p">(</span><span class="n">UITextView</span> <span class="o">*</span><span class="n">x</span><span class="p">)</span> <span class="p">{</span>
+			<span class="k">return</span> <span class="n">x</span><span class="p">.</span><span class="n">text</span><span class="p">;</span>
+		<span class="p">}]</span>
+		<span class="n">takeUntil</span><span class="o">:</span><span class="n">self</span><span class="p">.</span><span class="n">rac_willDeallocSignal</span><span class="p">]</span>
+		<span class="n">setNameWithFormat</span><span class="o">:</span><span class="s">@"%@ -rac_textSignal"</span><span class="p">,</span> <span class="n">self</span><span class="p">.</span><span class="n">rac_description</span><span class="p">];</span>
+
+	<span class="n">RACUseDelegateProxy</span><span class="p">(</span><span class="n">self</span><span class="p">);</span>
+
+	<span class="k">return</span> <span class="n">signal</span><span class="p">;</span>
+<span class="err">}</span></code></pre></figure>
+
+<p>这里会用一个<code class="highlighter-rouge">self.rac_delegateProxy</code>作为<code class="highlighter-rouge">TextView</code>的proxy，调用<code class="highlighter-rouge">[self.rac_delegateProxy signalForSelector:@selector(textViewDidChange:)]</code> 也就是产生了一个信号， 当<code class="highlighter-rouge">[delegate textViewDidChange:]</code>调用时触发。</p>
+
+<p><code class="highlighter-rouge">rac_signalForSelector</code>中创建了一个<code class="highlighter-rouge">subject</code>(一个可以手动控制进行<code class="highlighter-rouge">sendNext</code>的信号), 做了很复杂的swizzling, 其中和发送信号相关的是<code class="highlighter-rouge">RACSwizzleForwardInvocation</code>, 这个方法改写了原本的<code class="highlighter-rouge">forwardInvocation</code>. 然后将自己的对应selector的方法替换成<code class="highlighter-rouge">forwardInvocation</code>，这个<code class="highlighter-rouge">forwardInvocation</code>里面会调用<code class="highlighter-rouge">[subject sendNext:]</code>发送信号给subscriber.</p>
+
+<p>一句话概括：<code class="highlighter-rouge">rac_textSignal</code>会”劫持” <code class="highlighter-rouge">UITextView.delegate的textViewDidChange:</code>方法，然后在这个方法调用时，把这个方法传入的参数发送给subscriber。这个劫持过程的实现是由<code class="highlighter-rouge">[NSObject rac_signalForSelector:]</code>方法完成的。</p>
+
+  </div><a class="u-url" href="/ios/reactive-2.html" hidden></a>
+</article>
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col">
+        <p class="feed-subscribe">
+          <a href="/feed.xml">
+            <svg class="svg-icon orange">
+              <use xlink:href="/assets/minima-social-icons.svg#rss"></use>
+            </svg><span>Subscribe</span>
+          </a>
+        </p>
+      </div>
+      <div class="footer-col">
+        <p>Chi&#39;s blog about ML, NLP, Programming and others.</p>
+      </div>
+    </div>
+
+    <div class="social-links"><ul class="social-media-list"><li><a rel="me" href="https://github.com/codescv" title="codescv"><svg class="svg-icon grey"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg></a></li><li><a rel="me" href="https://twitter.com/codescv" title="codescv"><svg class="svg-icon grey"><use xlink:href="/assets/minima-social-icons.svg#twitter"></use></svg></a></li></ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

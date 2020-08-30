@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="twitter:card" content="summary" /><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>Android 源代码上手指南 - Makefile语法 | Chi</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="Android 源代码上手指南 - Makefile语法" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="上一篇我们将到android build system, 讲了envsetup.sh和lunch, 在继续研究build过程之前有必要先讲讲Makefile的语法. android使用GNUMake 3.81(不支持其他版本!), 因此有许多GNU的特定语法, 和一般的Makefile长得很不一样. (为了叙述方便, 本文中凡是提到Makefile的地方, 均指GNU Makefile.) Makefile的基本语法是这样的:" />
+<meta property="og:description" content="上一篇我们将到android build system, 讲了envsetup.sh和lunch, 在继续研究build过程之前有必要先讲讲Makefile的语法. android使用GNUMake 3.81(不支持其他版本!), 因此有许多GNU的特定语法, 和一般的Makefile长得很不一样. (为了叙述方便, 本文中凡是提到Makefile的地方, 均指GNU Makefile.) Makefile的基本语法是这样的:" />
+<link rel="canonical" href="https://blog.codescv.com/survival-guide-android-source-code-makefile-syntax.html" />
+<meta property="og:url" content="https://blog.codescv.com/survival-guide-android-source-code-makefile-syntax.html" />
+<meta property="og:site_name" content="Chi" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2014-03-22T23:05:00-05:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.codescv.com/survival-guide-android-source-code-makefile-syntax.html"},"description":"上一篇我们将到android build system, 讲了envsetup.sh和lunch, 在继续研究build过程之前有必要先讲讲Makefile的语法. android使用GNUMake 3.81(不支持其他版本!), 因此有许多GNU的特定语法, 和一般的Makefile长得很不一样. (为了叙述方便, 本文中凡是提到Makefile的地方, 均指GNU Makefile.) Makefile的基本语法是这样的:","@type":"BlogPosting","url":"https://blog.codescv.com/survival-guide-android-source-code-makefile-syntax.html","headline":"Android 源代码上手指南 - Makefile语法","dateModified":"2014-03-22T23:05:00-05:00","datePublished":"2014-03-22T23:05:00-05:00","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="https://blog.codescv.com/feed.xml" title="Chi" /><link rel="shortcut icon" type="image/x-icon" href="/images/favicon.ico"><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>Android 源代码上手指南 - Makefile语法 | Chi</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="Android 源代码上手指南 - Makefile语法" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="上一篇我们将到android build system, 讲了envsetup.sh和lunch, 在继续研究build过程之前有必要先讲讲Makefile的语法. android使用GNUMake 3.81(不支持其他版本!), 因此有许多GNU的特定语法, 和一般的Makefile长得很不一样. (为了叙述方便, 本文中凡是提到Makefile的地方, 均指GNU Makefile.) Makefile的基本语法是这样的:" />
+<meta property="og:description" content="上一篇我们将到android build system, 讲了envsetup.sh和lunch, 在继续研究build过程之前有必要先讲讲Makefile的语法. android使用GNUMake 3.81(不支持其他版本!), 因此有许多GNU的特定语法, 和一般的Makefile长得很不一样. (为了叙述方便, 本文中凡是提到Makefile的地方, 均指GNU Makefile.) Makefile的基本语法是这样的:" />
+<link rel="canonical" href="https://blog.codescv.com/survival-guide-android-source-code-makefile-syntax.html" />
+<meta property="og:url" content="https://blog.codescv.com/survival-guide-android-source-code-makefile-syntax.html" />
+<meta property="og:site_name" content="Chi" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2014-03-22T23:05:00-05:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.codescv.com/survival-guide-android-source-code-makefile-syntax.html"},"description":"上一篇我们将到android build system, 讲了envsetup.sh和lunch, 在继续研究build过程之前有必要先讲讲Makefile的语法. android使用GNUMake 3.81(不支持其他版本!), 因此有许多GNU的特定语法, 和一般的Makefile长得很不一样. (为了叙述方便, 本文中凡是提到Makefile的地方, 均指GNU Makefile.) Makefile的基本语法是这样的:","@type":"BlogPosting","url":"https://blog.codescv.com/survival-guide-android-source-code-makefile-syntax.html","headline":"Android 源代码上手指南 - Makefile语法","dateModified":"2014-03-22T23:05:00-05:00","datePublished":"2014-03-22T23:05:00-05:00","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+<link href="https://unpkg.com/@primer/css/dist/primer.css" rel="stylesheet" />
+<link rel="stylesheet" href="//use.fontawesome.com/releases/v5.0.7/css/all.css"><link type="application/atom+xml" rel="alternate" href="https://blog.codescv.com/feed.xml" title="Chi" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.css" integrity="sha384-zB1R0rpPzHqg7Kpt0Aljp8JPLqbXI3bhnPWROx27a9N0Ll6ZP/+DiW/UqRcLbRjq" crossorigin="anonymous">
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"> </script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.js" integrity="sha384-y23I5Q6l+B6vatafAwxRu/0oK/79VlbSz7Q9aiSZUvyWYIYsd+qj+o24G5ZU2zJz" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous"></script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement( document.body, {
+        delimiters: [
+            {left: "$$", right: "$$", display: true},
+            {left: "[%", right: "%]", display: true},
+            {left: "$", right: "$", display: false}
+        ]}
+        );
+    });
+    </script>
+
+
+<script>
+function wrap_img(fn) {
+    if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
+        var elements = document.querySelectorAll(".post img");
+        Array.prototype.forEach.call(elements, function(el, i) {
+            if (el.getAttribute("title") && (el.className != "emoji")) {
+                const caption = document.createElement('figcaption');
+                var node = document.createTextNode(el.getAttribute("title"));
+                caption.appendChild(node);
+                const wrapper = document.createElement('figure');
+                wrapper.className = 'image';
+                el.parentNode.insertBefore(wrapper, el);
+                el.parentNode.removeChild(el);
+                wrapper.appendChild(el);
+                wrapper.appendChild(caption);
+            }
+        });
+    } else { document.addEventListener('DOMContentLoaded', fn); }
+}
+window.onload = wrap_img;
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+    // add link icon to anchor tags
+    var elem = document.querySelectorAll(".anchor-link")
+    elem.forEach(e => (e.innerHTML = '<i class="fas fa-link fa-xs"></i>'));
+    });
+</script>
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Chi</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About Me</a><a class="page-link" href="/search/">Search</a><a class="page-link" href="/categories/">Tags</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">Android 源代码上手指南 - Makefile语法</h1><p class="post-meta post-meta-title"><time class="dt-published" datetime="2014-03-22T23:05:00-05:00" itemprop="datePublished">
+        Mar 22, 2014
+      </time>
+       • <span class="read-time" title="Estimated read time">
+    
+    
+      1 min read
+    
+</span></p>
+
+    
+
+    </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <p>上一篇我们将到android build system, 讲了envsetup.sh和lunch, 在继续研究build过程之前有必要先讲讲Makefile的语法. android使用<code class="highlighter-rouge">GNUMake 3.81</code>(<strong>不支持其他版本!</strong>), 因此有许多GNU的特定语法, 和一般的Makefile长得很不一样. (为了叙述方便, 本文中凡是提到<code class="highlighter-rouge">Makefile</code>的地方, 均指<code class="highlighter-rouge">GNU Makefile</code>.) Makefile的基本语法是这样的:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>TARGET: &lt;DEPENDS&gt;
+&lt;TAB&gt;   instructions
+</code></pre></div></div>
+
+<p>运行<code class="highlighter-rouge">make TARGET</code>命令时, 根据TARGET对应的DEPENDS来确定依赖关系, 根据修改时间来判断某个TARGET是否需要rebuild.如果需要, 则执行<code class="highlighter-rouge">TARGET</code>对应的instructions. 这就是Makefile的基本原理.</p>
+
+<h1 id="phony-targets">.PHONY targets</h1>
+<p>在Makefile中, 有时会遇到标明为<code class="highlighter-rouge">.PHONY</code>的target, 它表示这个target只是一个名字, 不是一个文件. 例如:</p>
+
+<figure class="highlight"><pre><code class="language-makefile" data-lang="makefile"><span class="nl">clean</span><span class="o">:</span>
+		<span class="nb">rm</span> <span class="k">*</span>.o temp</code></pre></figure>
+
+<p>这个名为<code class="highlighter-rouge">clean</code>的target指示makefile去做一些删除临时文件的指令, 但如果你的目录下刚好有个名为<code class="highlighter-rouge">clean</code>的文件, 又因为clean没有任何的dependencies, make会认为<code class="highlighter-rouge">clean</code>这个文件是最新的, 不需要执行. 这时我们就要告诉make, <code class="highlighter-rouge">clean</code>这个target只是一个名称而已, 并不是一个文件:</p>
+
+<figure class="highlight"><pre><code class="language-makefile" data-lang="makefile"><span class="nl">.PHONY</span><span class="o">:</span> <span class="nf">clean</span></code></pre></figure>
+
+<h1 id="multiple-targets">multiple targets</h1>
+<p>当一行写有个多个target时, 相当于把这些target分开写, 并使用一样的commands. 例如:</p>
+
+<figure class="highlight"><pre><code class="language-makefile" data-lang="makefile"><span class="nl">foo bar</span><span class="o">:</span>
+		<span class="nb">echo</span> <span class="nv">$@</span>    			</code></pre></figure>
+
+<p>等价于:</p>
+
+<figure class="highlight"><pre><code class="language-makefile" data-lang="makefile"><span class="nl">foo</span><span class="o">:</span>
+		<span class="nb">echo</span> <span class="nv">$@</span>
+<span class="nl">bar</span><span class="o">:</span>
+		<span class="nb">echo</span> <span class="nv">$@</span></code></pre></figure>
+
+<p>其中$@会被替换为target名称.</p>
+
+<p>在<code class="highlighter-rouge">GNUMake</code>中, 有一些特定的语法在android中广泛使用, 下面一一介绍一下:</p>
+
+<h1 id="define">define</h1>
+<p>在<code class="highlighter-rouge">Makefile</code>中, 定义一个变量可以用<code class="highlighter-rouge">=</code>或者<code class="highlighter-rouge">:=</code>.
+其中<code class="highlighter-rouge">=</code>和<code class="highlighter-rouge">:=</code>的区别在于, <code class="highlighter-rouge">=</code>是<code class="highlighter-rouge">recusively expanded variable</code>, 它在每次被用到的时候都会被求值; 而<code class="highlighter-rouge">:=</code>是<code class="highlighter-rouge">simply expanded variable</code>, 它在定义的时候就被展开. 例如:</p>
+
+<figure class="highlight"><pre><code class="language-makefile" data-lang="makefile"><span class="nv">x</span> <span class="o">=</span> foo 
+<span class="nv">var1</span> <span class="o">=</span> <span class="nv">$(x)</span>
+<span class="nv">var2</span> <span class="o">:=</span> <span class="nv">$(x)</span>
+<span class="nv">x</span> <span class="o">=</span> bar 
+<span class="nl">target</span><span class="o">:</span>
+        <span class="nl">echo var1</span><span class="o">:</span> <span class="nf">$(var1)</span>
+        <span class="nl">echo var2</span><span class="o">:</span> <span class="nf">$(var2)</span></code></pre></figure>
+
+<p>执行<code class="highlighter-rouge">make</code>会显示:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>echo var1: bar
+var1: bar
+echo var2: foo
+var2: foo
+</code></pre></div></div>
+
+<p>除了<code class="highlighter-rouge">=</code>和<code class="highlighter-rouge">:=</code>, 还有一个<code class="highlighter-rouge">?=</code>, 它只在变量没有被定义时起作用, 常用于设置默认值.</p>
+
+<p>define 也可以用来定义一个变量, 但define更强的一点在于可以定义多行变量. 例如:</p>
+
+<figure class="highlight"><pre><code class="language-makefile" data-lang="makefile"><span class="err">define</span> <span class="err">command</span>
+<span class="err">@echo</span> <span class="err">foo</span>
+<span class="err">@echo</span> <span class="err">bar</span>
+<span class="err">endef</span>
+
+<span class="nl">target</span><span class="o">:</span>
+			<span class="nv">$(command)</span></code></pre></figure>
+
+<p>输出:</p>
+
+<p>foo
+  bar</p>
+
+<p>其中<code class="highlighter-rouge">@</code>放在一个命令前, 表示不输出这一行执行的命令.
+不过, 在Makefile中有一个<code class="highlighter-rouge">call</code>函数, 它可以”调用”一个变量, 因此变量可以用来实现类似于宏展开的功能. 例如:</p>
+
+<figure class="highlight"><pre><code class="language-makefile" data-lang="makefile"><span class="err">define</span> <span class="err">concat</span>
+<span class="err">$1,$2</span>
+<span class="err">endef</span>
+
+<span class="nl">target</span><span class="o">:</span>
+			<span class="p">@</span><span class="nb">echo</span> <span class="nf">$(</span><span class="nb">call</span> concat,foo,bar<span class="nf">)</span></code></pre></figure>
+
+<p>会输出:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>foo,bar
+</code></pre></div></div>
+
+<p>这里有个坑: <code class="highlighter-rouge">$(call concat,foo,bar)</code>注意我没有输入空格, 如果我写成<code class="highlighter-rouge">$(call concat, foo, bar)</code>, 那么在concat展开的时候, 参数<code class="highlighter-rouge">$1</code>就会等于前面带一个空格的<code class="highlighter-rouge">_foo</code>, <code class="highlighter-rouge">$2</code>就会等于前面带一个空格的<code class="highlighter-rouge">_bar</code>(我这里用下划线来表示空格作为警示). 这个在用的时候要格外小心!</p>
+
+<h1 id="include">include</h1>
+<p><code class="highlighter-rouge">include</code>用于包含另一个Makefile, 这个在比较大规模的项目中比较有用, 有助于Makefile的重用和模块化. 例如你可以将一些常用的宏扩展和变量定义放在一个<code class="highlighter-rouge">definitions.mk</code>中, 然后从你的Makefile中include之.</p>
+
+<figure class="highlight"><pre><code class="language-makefile" data-lang="makefile"><span class="k">include</span><span class="sx"> some_file.mk</span>
+<span class="k">-include</span><span class="sx"> other_file.mk</span></code></pre></figure>
+
+<p>当include一个文件而这个文件不存在时, Make会报错, 而在<code class="highlighter-rouge">include</code>之前加上<code class="highlighter-rouge">-</code>表示文件不存在时不要报错. 这个常用来包含可选的文件.</p>
+
+<h1 id="if">if</h1>
+<p>在make语法中有一些常用的条件语句, 类似于C语言中的<code class="highlighter-rouge">#ifdef</code>和<code class="highlighter-rouge">#if</code>等. 例如:</p>
+
+<figure class="highlight"><pre><code class="language-makefile" data-lang="makefile"><span class="err">ifeq($(var),foo)</span>
+	<span class="err">echo</span> <span class="err">foo</span>
+<span class="k">else</span>
+	<span class="err">echo</span> <span class="err">not</span> <span class="err">foo</span>
+<span class="err">endif</span></code></pre></figure>
+
+<p><code class="highlighter-rouge">ifeq</code>检测后面两个值是否相等. 类似的还有<code class="highlighter-rouge">ifneq</code>, <code class="highlighter-rouge">ifdef</code>, <code class="highlighter-rouge">ifndef</code>检测一个变量是否被定义, 等等.</p>
+
+<h1 id="函数">函数</h1>
+<p>makefile中内置了一些函数, 方便实现一些常用的功能. 调用一个函数的语法是:</p>
+
+<figure class="highlight"><pre><code class="language-makefile" data-lang="makefile"><span class="err">$(function</span> <span class="err">arguments)</span> <span class="err">或者</span>
+<span class="err">${function</span> <span class="err">arguments}</span></code></pre></figure>
+
+<p>下面列举一些常见函数:</p>
+
+<h2 id="字符串操作">字符串操作</h2>
+<ul>
+  <li>$(subst <em>from</em>, <em>to</em>, <em>text</em>)  字符串替换</li>
+  <li>$(strip <em>string</em>) 去掉开头和末尾的空白. (还记得前面说的那个坑吗?)</li>
+  <li>$(filter <em>pattern</em>…, <em>text</em>) 取出所有匹配的文本, 丢到所有不匹配的. 例如<code class="highlighter-rouge">$(filter %.c %.s,$(sources))</code>取出<code class="highlighter-rouge">sources</code>变量中所有以<code class="highlighter-rouge">.c</code>和<code class="highlighter-rouge">.s</code>结尾的文本.</li>
+  <li>$(filter-out <em>pattern</em>…, _text) 和上面相反, 取出所有不匹配的.</li>
+  <li>$(word <em>n</em>, <em>text</em>) 取出<code class="highlighter-rouge">text</code>中第<code class="highlighter-rouge">n</code>项.</li>
+</ul>
+
+<h2 id="文件名操作">文件名操作</h2>
+<ul>
+  <li>$(dir <em>names</em>…) 取出<code class="highlighter-rouge">names</code>中所有文件的目录部分.</li>
+  <li>$(notdir <em>names</em>…) 和上面相反, 取出非目录部分(纯文件名部分).</li>
+  <li>$(add_prefix <em>prefix</em>, <em>names</em>…) 给文件加前缀</li>
+  <li>$(wildcard <em>pattern</em>) 获取匹配通配符的文件名. 例如<code class="highlighter-rouge">objects := $(wildcard *.o)</code>返回所有<code class="highlighter-rouge">.o</code>结尾的文件.</li>
+</ul>
+
+<h2 id="foreach">foreach</h2>
+<p>$(foreach <em>var</em>, <em>list</em>, <em>text</em>)  将<code class="highlighter-rouge">var</code>作为形式参数, <code class="highlighter-rouge">list</code>作为列表, 扩展<code class="highlighter-rouge">text</code>的内容. 相当于python中的:</p>
+
+<figure class="highlight"><pre><code class="language-python" data-lang="python">	<span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">:</span>
+      <span class="n">text</span></code></pre></figure>
+
+<h2 id="call">call</h2>
+<p>在前面提到了, 用于”展开”一个宏(变量)</p>
+
+<h2 id="eval">eval</h2>
+<p><code class="highlighter-rouge">eval</code>是个很重要的函数, 可以用来实现Makefile的模板. 比较关键的一点是需要知道传给<code class="highlighter-rouge">eval</code>的参数被展开了两次, 首先是传给eval之前, 然后再被当作makefile的语句include到当前的地方. 这个我们之后会继续讲到, 先放一个例子在这里.</p>
+
+<figure class="highlight"><pre><code class="language-makefile" data-lang="makefile"><span class="nv">PROGRAMS</span>    <span class="o">=</span> server client
+
+<span class="nv">server_OBJS</span> <span class="o">=</span> server.o server_priv.o server_access.o
+<span class="nv">server_LIBS</span> <span class="o">=</span> priv protocol
+
+<span class="nv">client_OBJS</span> <span class="o">=</span> client.o client_api.o client_mem.o
+<span class="nv">client_LIBS</span> <span class="o">=</span> protocol
+
+<span class="c"># Everything after this is generic
+</span>
+<span class="nl">.PHONY</span><span class="o">:</span> <span class="nf">all</span>
+<span class="nl">all</span><span class="o">:</span> <span class="nf">$(PROGRAMS)</span>
+
+<span class="err">define</span> <span class="nv">PROGRAM_template</span> <span class="o">=</span>
+ <span class="nl">$(1)</span><span class="o">:</span> <span class="nf">$$($(1)_OBJS) $$($(1)_LIBS:%=-l%)</span>
+ <span class="nv">ALL_OBJS</span>   <span class="o">+=</span> <span class="err">$$</span><span class="o">(</span><span class="nv">$(1)</span>_OBJS<span class="o">)</span>
+<span class="err">endef</span>
+
+<span class="err">$(foreach</span> <span class="err">prog,$(PROGRAMS),$(eval</span> <span class="err">$(call</span> <span class="err">PROGRAM_template,$(prog))))</span>
+
+<span class="nl">$(PROGRAMS)</span><span class="o">:</span>
+        <span class="err">$(LINK.o)</span> <span class="err">$^</span> <span class="err">$(LDLIBS)</span> <span class="err">-o</span> <span class="err">$@</span>
+
+<span class="nl">clean</span><span class="o">:</span>
+        <span class="err">rm</span> <span class="err">-f</span> <span class="err">$(ALL_OBJS)</span> <span class="err">$(PROGRAMS)</span></code></pre></figure>
+
+<h2 id="输出调试">输出调试</h2>
+<p>这些语句被用于输出调试信息: (debug和研究时都非常有用!)</p>
+<ul>
+  <li>$(warning <em>text</em>…)</li>
+  <li>$(info <em>text</em>…)</li>
+  <li>$(origin <em>variable</em>) 可以告诉你一个变量是从哪里来的, 是环境中定义的, 还是makefile中定义的, 还是命令行中定义的. 这个在调试的时候也很有用. 参考<a href="http://www.gnu.org/software/make/manual/make.html#Functions">这里</a></li>
+</ul>
+
+<h2 id="运行shell语句">运行shell语句</h2>
+<ul>
+  <li>$(shell <em>command</em>) 用于运行一个shell语句, 然后将输出返回. 这个也非常有用, 例如有了这个你就可以用你自己喜欢的工具例如perl之类来进行字符串操作了, 可以不用费力学习和记忆makefile中相应的函数的语法.</li>
+</ul>
+
+
+  </div><!-- from https://github.com/utterance/utterances -->
+<script src="https://utteranc.es/client.js"
+        repo="codescv/blog"
+        issue-term="title"
+        label="blogpost-comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script><a class="u-url" href="/survival-guide-android-source-code-makefile-syntax.html" hidden></a>
+</article>
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col">
+        <p class="feed-subscribe">
+          <a href="/feed.xml">
+            <svg class="svg-icon orange">
+              <use xlink:href="/assets/minima-social-icons.svg#rss"></use>
+            </svg><span>Subscribe</span>
+          </a>
+        </p>
+      </div>
+      <div class="footer-col">
+        <p>Chi&#39;s blog about ML, NLP, Programming and others.</p>
+      </div>
+    </div>
+
+    <div class="social-links"><ul class="social-media-list"><li><a rel="me" href="https://github.com/codescv" title="codescv"><svg class="svg-icon grey"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg></a></li><li><a rel="me" href="https://twitter.com/codescv" title="codescv"><svg class="svg-icon grey"><use xlink:href="/assets/minima-social-icons.svg#twitter"></use></svg></a></li></ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

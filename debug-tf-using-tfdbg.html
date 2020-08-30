@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="twitter:card" content="summary" /><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>使用tfdbg Debug Tensorflow代码 | Chi</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="使用tfdbg Debug Tensorflow代码" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="由于Tensorflow使用静态图，先build graph然后run graph, 所以用一般的python debugger不能单步跟踪计算过程。如果想要debug 计算的中间过程, 一种简单的办法是在fetches中加入想要查看的tensor, 但是在调试中如果需要查看很多个tensor的值，这种方法不是很方便。 Tensorflow官方提供了tfdbg这个命令行工具来解决这个问题。" />
+<meta property="og:description" content="由于Tensorflow使用静态图，先build graph然后run graph, 所以用一般的python debugger不能单步跟踪计算过程。如果想要debug 计算的中间过程, 一种简单的办法是在fetches中加入想要查看的tensor, 但是在调试中如果需要查看很多个tensor的值，这种方法不是很方便。 Tensorflow官方提供了tfdbg这个命令行工具来解决这个问题。" />
+<link rel="canonical" href="https://blog.codescv.com/debug-tf-using-tfdbg.html" />
+<meta property="og:url" content="https://blog.codescv.com/debug-tf-using-tfdbg.html" />
+<meta property="og:site_name" content="Chi" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2018-10-14T01:00:00-05:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.codescv.com/debug-tf-using-tfdbg.html"},"description":"由于Tensorflow使用静态图，先build graph然后run graph, 所以用一般的python debugger不能单步跟踪计算过程。如果想要debug 计算的中间过程, 一种简单的办法是在fetches中加入想要查看的tensor, 但是在调试中如果需要查看很多个tensor的值，这种方法不是很方便。 Tensorflow官方提供了tfdbg这个命令行工具来解决这个问题。","@type":"BlogPosting","url":"https://blog.codescv.com/debug-tf-using-tfdbg.html","headline":"使用tfdbg Debug Tensorflow代码","dateModified":"2018-10-14T01:00:00-05:00","datePublished":"2018-10-14T01:00:00-05:00","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="https://blog.codescv.com/feed.xml" title="Chi" /><link rel="shortcut icon" type="image/x-icon" href="/images/favicon.ico"><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>使用tfdbg Debug Tensorflow代码 | Chi</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="使用tfdbg Debug Tensorflow代码" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="由于Tensorflow使用静态图，先build graph然后run graph, 所以用一般的python debugger不能单步跟踪计算过程。如果想要debug 计算的中间过程, 一种简单的办法是在fetches中加入想要查看的tensor, 但是在调试中如果需要查看很多个tensor的值，这种方法不是很方便。 Tensorflow官方提供了tfdbg这个命令行工具来解决这个问题。" />
+<meta property="og:description" content="由于Tensorflow使用静态图，先build graph然后run graph, 所以用一般的python debugger不能单步跟踪计算过程。如果想要debug 计算的中间过程, 一种简单的办法是在fetches中加入想要查看的tensor, 但是在调试中如果需要查看很多个tensor的值，这种方法不是很方便。 Tensorflow官方提供了tfdbg这个命令行工具来解决这个问题。" />
+<link rel="canonical" href="https://blog.codescv.com/debug-tf-using-tfdbg.html" />
+<meta property="og:url" content="https://blog.codescv.com/debug-tf-using-tfdbg.html" />
+<meta property="og:site_name" content="Chi" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2018-10-14T01:00:00-05:00" />
+<script type="application/ld+json">
+{"mainEntityOfPage":{"@type":"WebPage","@id":"https://blog.codescv.com/debug-tf-using-tfdbg.html"},"description":"由于Tensorflow使用静态图，先build graph然后run graph, 所以用一般的python debugger不能单步跟踪计算过程。如果想要debug 计算的中间过程, 一种简单的办法是在fetches中加入想要查看的tensor, 但是在调试中如果需要查看很多个tensor的值，这种方法不是很方便。 Tensorflow官方提供了tfdbg这个命令行工具来解决这个问题。","@type":"BlogPosting","url":"https://blog.codescv.com/debug-tf-using-tfdbg.html","headline":"使用tfdbg Debug Tensorflow代码","dateModified":"2018-10-14T01:00:00-05:00","datePublished":"2018-10-14T01:00:00-05:00","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+<link href="https://unpkg.com/@primer/css/dist/primer.css" rel="stylesheet" />
+<link rel="stylesheet" href="//use.fontawesome.com/releases/v5.0.7/css/all.css"><link type="application/atom+xml" rel="alternate" href="https://blog.codescv.com/feed.xml" title="Chi" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.css" integrity="sha384-zB1R0rpPzHqg7Kpt0Aljp8JPLqbXI3bhnPWROx27a9N0Ll6ZP/+DiW/UqRcLbRjq" crossorigin="anonymous">
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML"> </script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.js" integrity="sha384-y23I5Q6l+B6vatafAwxRu/0oK/79VlbSz7Q9aiSZUvyWYIYsd+qj+o24G5ZU2zJz" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous"></script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement( document.body, {
+        delimiters: [
+            {left: "$$", right: "$$", display: true},
+            {left: "[%", right: "%]", display: true},
+            {left: "$", right: "$", display: false}
+        ]}
+        );
+    });
+    </script>
+
+
+<script>
+function wrap_img(fn) {
+    if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
+        var elements = document.querySelectorAll(".post img");
+        Array.prototype.forEach.call(elements, function(el, i) {
+            if (el.getAttribute("title") && (el.className != "emoji")) {
+                const caption = document.createElement('figcaption');
+                var node = document.createTextNode(el.getAttribute("title"));
+                caption.appendChild(node);
+                const wrapper = document.createElement('figure');
+                wrapper.className = 'image';
+                el.parentNode.insertBefore(wrapper, el);
+                el.parentNode.removeChild(el);
+                wrapper.appendChild(el);
+                wrapper.appendChild(caption);
+            }
+        });
+    } else { document.addEventListener('DOMContentLoaded', fn); }
+}
+window.onload = wrap_img;
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+    // add link icon to anchor tags
+    var elem = document.querySelectorAll(".anchor-link")
+    elem.forEach(e => (e.innerHTML = '<i class="fas fa-link fa-xs"></i>'));
+    });
+</script>
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Chi</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About Me</a><a class="page-link" href="/search/">Search</a><a class="page-link" href="/categories/">Tags</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">使用tfdbg Debug Tensorflow代码</h1><p class="post-meta post-meta-title"><time class="dt-published" datetime="2018-10-14T01:00:00-05:00" itemprop="datePublished">
+        Oct 14, 2018
+      </time>
+       • <span class="read-time" title="Estimated read time">
+    
+    
+      1 min read
+    
+</span></p>
+
+    
+
+    </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <p>由于Tensorflow使用静态图，先build graph然后run graph, 所以用一般的python debugger不能单步跟踪计算过程。如果想要debug
+计算的中间过程, 一种简单的办法是在fetches中加入想要查看的tensor, 但是在调试中如果需要查看很多个tensor的值，这种方法不是很方便。
+Tensorflow官方提供了tfdbg这个命令行工具来解决这个问题。</p>
+
+<h1 id="准备工作">准备工作</h1>
+<h2 id="使用tfdbg来包装session">使用tfdbg来包装Session</h2>
+<p>对一般使用Session的Tensorflow程序，可以使用<code class="highlighter-rouge">LocalCLIDebugWrapperSession</code>来启用tfdbg，例如</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">tensorflow.python</span> <span class="kn">import</span> <span class="n">debug</span> <span class="k">as</span> <span class="n">tf_debug</span>
+<span class="n">sess</span> <span class="o">=</span> <span class="n">tf_debug</span><span class="o">.</span><span class="n">LocalCLIDebugWrapperSession</span><span class="p">(</span><span class="n">sess</span><span class="p">)</span>
+</code></pre></div></div>
+
+<h2 id="使用hook来注入estimator">使用hook来注入Estimator</h2>
+<p>如果使用Estimator, 那么需要使用<code class="highlighter-rouge">LocalCLIDebugHook</code>来启用tfdbg, 例如</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">tensorflow.python</span> <span class="kn">import</span> <span class="n">debug</span> <span class="k">as</span> <span class="n">tf_debug</span>
+
+<span class="c1"># Create a LocalCLIDebugHook and use it as a monitor when calling fit().
+</span><span class="n">hooks</span> <span class="o">=</span> <span class="p">[</span><span class="n">tf_debug</span><span class="o">.</span><span class="n">LocalCLIDebugHook</span><span class="p">()]</span>
+</code></pre></div></div>
+
+<h1 id="tfdbg的使用">tfdbg的使用</h1>
+<p>以<a href="https://github.com/tensorflow/tensorflow/blob/master/tensorflow/python/debug/examples/debug_mnist.py">debug_mnist.py</a>这个脚本为例。
+首先运行脚本:</p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python debug_mnist.py <span class="nt">--debug</span>
+</code></pre></div></div>
+<p>进入tfdbg的主界面:</p>
+
+<p><img src="/images/tfdbg-main.png" alt="tfdbg-main" /></p>
+
+<p>上面一行<code class="highlighter-rouge">run #1: 1 fetch (accuracy/accuracy/Mean:0); 2 feeds</code>表示当前这次<code class="highlighter-rouge">Session.run</code>的信息, 对应到代码里:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mi">135</span>   <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">FLAGS</span><span class="o">.</span><span class="n">max_steps</span><span class="p">):</span>
+<span class="mi">136</span>     <span class="n">acc</span> <span class="o">=</span> <span class="n">sess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">accuracy</span><span class="p">,</span> <span class="n">feed_dict</span><span class="o">=</span><span class="n">feed_dict</span><span class="p">(</span><span class="bp">False</span><span class="p">))</span>
+<span class="mi">137</span>     <span class="k">print</span><span class="p">(</span><span class="s">"Accuracy at step </span><span class="si">%</span><span class="s">d: </span><span class="si">%</span><span class="s">s"</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">acc</span><span class="p">))</span>
+</code></pre></div></div>
+
+<p>在run_info里可以看到fetch是<code class="highlighter-rouge">accuracy/accuracy/Mean:0</code>, feed有两个:<code class="highlighter-rouge">x-input:0</code>和<code class="highlighter-rouge">y-input:0</code>.</p>
+
+<h2 id="使用run命令运行一个完整的step">使用run命令运行一个完整的step</h2>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>tfdbg&gt; run
+</code></pre></div></div>
+<p>使用<code class="highlighter-rouge">run</code>命令可以进行一次<code class="highlighter-rouge">Session.run</code>. 执行后的结果如图:</p>
+
+<p><img src="/images/tfdbg-run.png" alt="tfdbg-run" />
+在这个界面可以看到运行这个step中所有的Operation, tensor的大小，以及运行时间。
+点击其中的Tensor或者运行命令<code class="highlighter-rouge">pt &lt;tensor_name&gt;</code>,可以看见某个Tensor的值。例如点击<code class="highlighter-rouge">Softmax:0</code>以后，出现如下界面:</p>
+
+<p><img src="/images/tfdbg-printtensor.png" alt="tfdbg-printtensor" /></p>
+
+<p>点击<code class="highlighter-rouge">node_info</code>查看该节点的输入输出，以及在代码的什么位置被定义.</p>
+
+<p>点击<code class="highlighter-rouge">list_inputs</code>和<code class="highlighter-rouge">list_outputs</code>可以查看输入输出的依赖树.</p>
+
+<p>在<code class="highlighter-rouge">print_tensor</code>界面可以看到这个Softmax的函数输出的形状是<code class="highlighter-rouge">(10000, 10)</code>, 因为这是一个test batch, batch size是10000.</p>
+
+<p>使用<code class="highlighter-rouge">pf</code>命令可以打印feed, 从而验证这一点:</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>tfdbg&gt; pf input/x-input:0
+</code></pre></div></div>
+
+<p><img src="/images/tfdbg-pf.png" alt="tfdbg-pf" /></p>
+
+<h2 id="导出tensor到文件">导出Tensor到文件</h2>
+<p>当Tensor比较大的时候，如果希望把Tensor导出进行进一步分析, 例如我们想导出<code class="highlighter-rouge">hidden/weights/Variables:0</code>, 可以用如下命令:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>tfdbg&gt; eval -a '`hidden/weights/Variable:0`' -w '/tmp/variable.npy'
+或者
+tfdbg&gt; pt -s hidden/weights/Variable:0 -w '/tmp/variable.npy'
+</code></pre></div></div>
+
+<p><img src="/images/tfdbg-dump.png" alt="tfdbg-dump" /></p>
+
+<p>之后可以用numpy来读取这个变量, 例如</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="n">np</span>
+<span class="n">var</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s">'/tmp/variable.npy'</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p><code class="highlighter-rouge">eval</code>命令还可以支持更加复杂的语法, 例如</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>tfdbg&gt; eval "np.matmul((`output/Identity:0` / `Softmax:0`).T, `Softmax:0`)"
+</code></pre></div></div>
+
+<h2 id="单步跟踪">单步跟踪</h2>
+<p>使用<code class="highlighter-rouge">invoke_stepper</code>命令进入单步模式:</p>
+
+<p><img src="/images/tfdbg-stepper.png" alt="tfdbg-stepper" /></p>
+
+<p>接下来使用<code class="highlighter-rouge">s</code>命令就可以运行一个step(注意，这里step和之前step的概念不同)
+使用<code class="highlighter-rouge">s -t &lt;num&gt;</code> 可以运行<code class="highlighter-rouge">num</code>个step.
+使用<code class="highlighter-rouge">exit</code>运行余下的step并退出单步模式。</p>
+
+<h2 id="filter类似条件断点">filter(类似条件”断点”)</h2>
+<p>默认情况下打印的tensor有点多，如果希望按照自己设定的条件来打印相关tensor, 可以使用<code class="highlighter-rouge">filter</code>. 例如，设置如下filter:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">my_filter_callable</span><span class="p">(</span><span class="n">datum</span><span class="p">,</span> <span class="n">tensor</span><span class="p">):</span>
+    <span class="k">return</span> <span class="s">'Softmax'</span> <span class="ow">in</span> <span class="n">datum</span><span class="o">.</span><span class="n">tensor_name</span>
+<span class="n">sess</span> <span class="o">=</span> <span class="n">tf_debug</span><span class="o">.</span><span class="n">LocalCLIDebugWrapperSession</span><span class="p">(</span><span class="n">sess</span><span class="p">,</span> <span class="n">ui_type</span><span class="o">=</span><span class="n">FLAGS</span><span class="o">.</span><span class="n">ui_type</span><span class="p">)</span>
+<span class="n">sess</span><span class="o">.</span><span class="n">add_tensor_filter</span><span class="p">(</span><span class="s">'my_filter'</span><span class="p">,</span> <span class="n">my_filter_callable</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>则只有名称包含<code class="highlighter-rouge">Softmax</code>的tensor会被打印:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>run -f my_filter
+</code></pre></div></div>
+
+<p><img src="/images/tfdbg-filter.png" alt="tfdbg-filter" /></p>
+
+<p>再比如，想要运行到包含<code class="highlighter-rouge">nan</code>或者<code class="highlighter-rouge">inf</code>(一般情况下意味着训练有问题)的tensor可以使用:</p>
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>tfdbg&gt; run -f has_inf_or_nan
+</code></pre></div></div>
+
+<p><code class="highlighter-rouge">has_inf_or_nan</code>是一个默认被注册的<code class="highlighter-rouge">filter</code>.</p>
+
+  </div><a class="u-url" href="/debug-tf-using-tfdbg.html" hidden></a>
+</article>
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col">
+        <p class="feed-subscribe">
+          <a href="/feed.xml">
+            <svg class="svg-icon orange">
+              <use xlink:href="/assets/minima-social-icons.svg#rss"></use>
+            </svg><span>Subscribe</span>
+          </a>
+        </p>
+      </div>
+      <div class="footer-col">
+        <p>Chi&#39;s blog about ML, NLP, Programming and others.</p>
+      </div>
+    </div>
+
+    <div class="social-links"><ul class="social-media-list"><li><a rel="me" href="https://github.com/codescv" title="codescv"><svg class="svg-icon grey"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg></a></li><li><a rel="me" href="https://twitter.com/codescv" title="codescv"><svg class="svg-icon grey"><use xlink:href="/assets/minima-social-icons.svg#twitter"></use></svg></a></li></ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

@@ -109,7 +109,7 @@ window.onload = wrap_img;
        • <span class="read-time" title="Estimated read time">
     
     
-      7 min read
+      3 min read
     
 </span></p>
 
@@ -151,7 +151,11 @@ window.onload = wrap_img;
 
   <div class="post-content e-content" itemprop="articleBody">
     <ul class="section-nav">
-<li class="toc-entry toc-h1"><a href="#A-Simple-Example">A Simple Example </a></li>
+<li class="toc-entry toc-h1"><a href="#A-Simple-Example">A Simple Example </a>
+<ul>
+<li class="toc-entry toc-h4"><a href="#parallel">parallel[source]</a></li>
+</ul>
+</li>
 <li class="toc-entry toc-h1"><a href="#Dig-into-the-Implementation">Dig into the Implementation </a></li>
 <li class="toc-entry toc-h1"><a href="#Use-cases">Use cases </a></li>
 </ul><!--
@@ -194,10 +198,9 @@ window.onload = wrap_img;
 
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>pip install fastai nbdev
-<span class="kn">from</span> <span class="nn">nbdev.showdoc</span> <span class="kn">import</span> <span class="n">doc</span>
-<span class="kn">from</span> <span class="nn">fastcore.all</span> <span class="kn">import</span> <span class="n">parallel</span>
-<span class="n">doc</span><span class="p">(</span><span class="n">parallel</span><span class="p">)</span>
+<div class=" highlight hl-ipython3"><pre><span></span><span class="c1"># from nbdev.showdoc import doc</span>
+<span class="c1"># from fastcore.all import parallel</span>
+<span class="c1"># doc(parallel)</span>
 </pre></div>
 
     </div>
@@ -209,140 +212,19 @@ window.onload = wrap_img;
 
 <div class="output_area">
 
-<div class="output_subarea output_stream output_stdout output_text">
-<pre><span class="ansi-yellow-fg">WARNING: The directory '/github/home/.cache/pip' or its parent directory is not owned or is not writable by the current user. The cache has been disabled. Check the permissions and owner of that directory. If executing pip with sudo, you may want sudo's -H flag.</span>
-Collecting fastai
-  Downloading fastai-2.0.6-py3-none-any.whl (353 kB)
-     |████████████████████████████████| 353 kB 4.6 MB/s 
-Requirement already satisfied: nbdev in /usr/local/lib/python3.7/site-packages (0.2.18)
-Requirement already satisfied: pip in /usr/local/lib/python3.7/site-packages (from fastai) (20.2.2)
-Collecting torchvision&gt;=0.7
-  Downloading torchvision-0.7.0-cp37-cp37m-manylinux1_x86_64.whl (5.9 MB)
-     |████████████████████████████████| 5.9 MB 8.3 MB/s 
-Collecting matplotlib
-  Downloading matplotlib-3.3.1-cp37-cp37m-manylinux1_x86_64.whl (11.6 MB)
-     |████████████████████████████████| 11.6 MB 60.8 MB/s 
-Collecting pillow
-  Downloading Pillow-7.2.0-cp37-cp37m-manylinux1_x86_64.whl (2.2 MB)
-     |████████████████████████████████| 2.2 MB 58.8 MB/s 
-Collecting scikit-learn
-  Downloading scikit_learn-0.23.2-cp37-cp37m-manylinux1_x86_64.whl (6.8 MB)
-     |████████████████████████████████| 6.8 MB 36.8 MB/s 
-Collecting torch&gt;=1.6.0
-  Downloading torch-1.6.0-cp37-cp37m-manylinux1_x86_64.whl (748.8 MB)
-     |████████████████████████████████| 748.8 MB 74.8 MB/s 
-Collecting fastprogress&gt;=0.2.4
-  Downloading fastprogress-1.0.0-py3-none-any.whl (12 kB)
-Requirement already satisfied: packaging in /usr/local/lib/python3.7/site-packages (from fastai) (20.4)
-Collecting requests
-  Downloading requests-2.24.0-py2.py3-none-any.whl (61 kB)
-     |████████████████████████████████| 61 kB 17.8 MB/s 
-Requirement already satisfied: pyyaml in /usr/local/lib/python3.7/site-packages (from fastai) (5.3.1)
-Collecting spacy
-  Downloading spacy-2.3.2-cp37-cp37m-manylinux1_x86_64.whl (9.9 MB)
-     |████████████████████████████████| 9.9 MB 19.3 MB/s 
-Collecting pandas&gt;=1.1.0
-  Downloading pandas-1.1.1-cp37-cp37m-manylinux1_x86_64.whl (10.5 MB)
-     |████████████████████████████████| 10.5 MB 62.7 MB/s 
-Collecting fastcore&gt;=1.0.0
-  Downloading fastcore-1.0.0-py3-none-any.whl (36 kB)
-Collecting scipy
-  Downloading scipy-1.5.2-cp37-cp37m-manylinux1_x86_64.whl (25.9 MB)
-     |████████████████████████████████| 25.9 MB 19.7 MB/s 
-Requirement already satisfied: fastscript in /usr/local/lib/python3.7/site-packages (from nbdev) (1.0.0)
-Requirement already satisfied: nbformat&gt;=4.4.0 in /usr/local/lib/python3.7/site-packages (from nbdev) (5.0.7)
-Requirement already satisfied: nbconvert&gt;=5.6.1 in /usr/local/lib/python3.7/site-packages (from nbdev) (5.6.1)
-Collecting numpy
-  Downloading numpy-1.19.1-cp37-cp37m-manylinux2010_x86_64.whl (14.5 MB)
-     |████████████████████████████████| 14.5 MB 51.2 MB/s 
-Requirement already satisfied: pyparsing!=2.0.4,!=2.1.2,!=2.1.6,&gt;=2.0.3 in /usr/local/lib/python3.7/site-packages (from matplotlib-&gt;fastai) (2.4.7)
-Collecting certifi&gt;=2020.06.20
-  Downloading certifi-2020.6.20-py2.py3-none-any.whl (156 kB)
-     |████████████████████████████████| 156 kB 63.2 MB/s 
-Requirement already satisfied: python-dateutil&gt;=2.1 in /usr/local/lib/python3.7/site-packages (from matplotlib-&gt;fastai) (2.8.1)
-Collecting cycler&gt;=0.10
-  Downloading cycler-0.10.0-py2.py3-none-any.whl (6.5 kB)
-Collecting kiwisolver&gt;=1.0.1
-  Downloading kiwisolver-1.2.0-cp37-cp37m-manylinux1_x86_64.whl (88 kB)
-     |████████████████████████████████| 88 kB 54.4 MB/s 
-Collecting joblib&gt;=0.11
-  Downloading joblib-0.16.0-py3-none-any.whl (300 kB)
-     |████████████████████████████████| 300 kB 58.3 MB/s 
-Collecting threadpoolctl&gt;=2.0.0
-  Downloading threadpoolctl-2.1.0-py3-none-any.whl (12 kB)
-Collecting future
-  Downloading future-0.18.2.tar.gz (829 kB)
-     |████████████████████████████████| 829 kB 39.9 MB/s 
-Requirement already satisfied: six in /usr/local/lib/python3.7/site-packages (from packaging-&gt;fastai) (1.15.0)
-Collecting idna&lt;3,&gt;=2.5
-  Downloading idna-2.10-py2.py3-none-any.whl (58 kB)
-     |████████████████████████████████| 58 kB 51.3 MB/s 
-Collecting urllib3!=1.25.0,!=1.25.1,&lt;1.26,&gt;=1.21.1
-  Downloading urllib3-1.25.10-py2.py3-none-any.whl (127 kB)
-     |████████████████████████████████| 127 kB 66.5 MB/s 
-Collecting chardet&lt;4,&gt;=3.0.2
-  Downloading chardet-3.0.4-py2.py3-none-any.whl (133 kB)
-     |████████████████████████████████| 133 kB 67.8 MB/s 
-Collecting cymem&lt;2.1.0,&gt;=2.0.2
-  Downloading cymem-2.0.3-cp37-cp37m-manylinux1_x86_64.whl (32 kB)
-Collecting preshed&lt;3.1.0,&gt;=3.0.2
-  Downloading preshed-3.0.2-cp37-cp37m-manylinux1_x86_64.whl (118 kB)
-     |████████████████████████████████| 118 kB 68.3 MB/s 
-Collecting srsly&lt;1.1.0,&gt;=1.0.2
-  Downloading srsly-1.0.2-cp37-cp37m-manylinux1_x86_64.whl (185 kB)
-     |████████████████████████████████| 185 kB 62.4 MB/s 
-Collecting murmurhash&lt;1.1.0,&gt;=0.28.0
-  Downloading murmurhash-1.0.2-cp37-cp37m-manylinux1_x86_64.whl (19 kB)
-Collecting wasabi&lt;1.1.0,&gt;=0.4.0
-  Downloading wasabi-0.8.0-py3-none-any.whl (23 kB)
-Collecting tqdm&lt;5.0.0,&gt;=4.38.0
-  Downloading tqdm-4.48.2-py2.py3-none-any.whl (68 kB)
-     |████████████████████████████████| 68 kB 52.2 MB/s 
-Requirement already satisfied: setuptools in /usr/local/lib/python3.7/site-packages (from spacy-&gt;fastai) (41.2.0)
-Collecting blis&lt;0.5.0,&gt;=0.4.0
-  Downloading blis-0.4.1-cp37-cp37m-manylinux1_x86_64.whl (3.7 MB)
-     |████████████████████████████████| 3.7 MB 61.1 MB/s 
-Collecting plac&lt;1.2.0,&gt;=0.9.6
-  Downloading plac-1.1.3-py2.py3-none-any.whl (20 kB)
-Collecting thinc==7.4.1
-  Downloading thinc-7.4.1-cp37-cp37m-manylinux1_x86_64.whl (2.1 MB)
-     |████████████████████████████████| 2.1 MB 61.5 MB/s 
-Collecting catalogue&lt;1.1.0,&gt;=0.0.7
-  Downloading catalogue-1.0.0-py2.py3-none-any.whl (7.7 kB)
-Collecting pytz&gt;=2017.2
-  Downloading pytz-2020.1-py2.py3-none-any.whl (510 kB)
-     |████████████████████████████████| 510 kB 60.0 MB/s 
-Collecting dataclasses
-  Downloading dataclasses-0.6-py3-none-any.whl (14 kB)
-Requirement already satisfied: wheel in /usr/local/lib/python3.7/site-packages (from fastcore&gt;=1.0.0-&gt;fastai) (0.33.6)
-Requirement already satisfied: jupyter-core in /usr/local/lib/python3.7/site-packages (from nbformat&gt;=4.4.0-&gt;nbdev) (4.6.3)
-Requirement already satisfied: traitlets&gt;=4.1 in /usr/local/lib/python3.7/site-packages (from nbformat&gt;=4.4.0-&gt;nbdev) (4.3.3)
-Requirement already satisfied: jsonschema!=2.5.0,&gt;=2.4 in /usr/local/lib/python3.7/site-packages (from nbformat&gt;=4.4.0-&gt;nbdev) (3.2.0)
-Requirement already satisfied: ipython-genutils in /usr/local/lib/python3.7/site-packages (from nbformat&gt;=4.4.0-&gt;nbdev) (0.2.0)
-Requirement already satisfied: pygments in /usr/local/lib/python3.7/site-packages (from nbconvert&gt;=5.6.1-&gt;nbdev) (2.6.1)
-Requirement already satisfied: jinja2&gt;=2.4 in /usr/local/lib/python3.7/site-packages (from nbconvert&gt;=5.6.1-&gt;nbdev) (2.11.2)
-Requirement already satisfied: pandocfilters&gt;=1.4.1 in /usr/local/lib/python3.7/site-packages (from nbconvert&gt;=5.6.1-&gt;nbdev) (1.4.2)
-Requirement already satisfied: defusedxml in /usr/local/lib/python3.7/site-packages (from nbconvert&gt;=5.6.1-&gt;nbdev) (0.6.0)
-Requirement already satisfied: mistune&lt;2,&gt;=0.8.1 in /usr/local/lib/python3.7/site-packages (from nbconvert&gt;=5.6.1-&gt;nbdev) (0.8.4)
-Requirement already satisfied: bleach in /usr/local/lib/python3.7/site-packages (from nbconvert&gt;=5.6.1-&gt;nbdev) (3.1.5)
-Requirement already satisfied: entrypoints&gt;=0.2.2 in /usr/local/lib/python3.7/site-packages (from nbconvert&gt;=5.6.1-&gt;nbdev) (0.3)
-Requirement already satisfied: testpath in /usr/local/lib/python3.7/site-packages (from nbconvert&gt;=5.6.1-&gt;nbdev) (0.4.4)
-Requirement already satisfied: importlib-metadata&gt;=0.20; python_version &lt; "3.8" in /usr/local/lib/python3.7/site-packages (from catalogue&lt;1.1.0,&gt;=0.0.7-&gt;spacy-&gt;fastai) (1.7.0)
-Requirement already satisfied: decorator in /usr/local/lib/python3.7/site-packages (from traitlets&gt;=4.1-&gt;nbformat&gt;=4.4.0-&gt;nbdev) (4.4.2)
-Requirement already satisfied: pyrsistent&gt;=0.14.0 in /usr/local/lib/python3.7/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.4.0-&gt;nbdev) (0.16.0)
-Requirement already satisfied: attrs&gt;=17.4.0 in /usr/local/lib/python3.7/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.4.0-&gt;nbdev) (20.1.0)
-Requirement already satisfied: MarkupSafe&gt;=0.23 in /usr/local/lib/python3.7/site-packages (from jinja2&gt;=2.4-&gt;nbconvert&gt;=5.6.1-&gt;nbdev) (1.1.1)
-Requirement already satisfied: webencodings in /usr/local/lib/python3.7/site-packages (from bleach-&gt;nbconvert&gt;=5.6.1-&gt;nbdev) (0.5.1)
-Requirement already satisfied: zipp&gt;=0.5 in /usr/local/lib/python3.7/site-packages (from importlib-metadata&gt;=0.20; python_version &lt; "3.8"-&gt;catalogue&lt;1.1.0,&gt;=0.0.7-&gt;spacy-&gt;fastai) (3.1.0)
-Building wheels for collected packages: future
-  Building wheel for future (setup.py) ... - \ | done
-  Created wheel for future: filename=future-0.18.2-py3-none-any.whl size=491056 sha256=dfb3fc061cbcd3cc706509ed99c49c546f724bcb7915675942c2a28b79dfb320
-  Stored in directory: /tmp/pip-ephem-wheel-cache-ljtswj9i/wheels/56/b0/fe/4410d17b32f1f0c3cf54cdfb2bc04d7b4b8f4ae377e2229ba0
-Successfully built future
-Installing collected packages: pillow, numpy, future, torch, torchvision, certifi, cycler, kiwisolver, matplotlib, joblib, scipy, threadpoolctl, scikit-learn, fastprogress, idna, urllib3, chardet, requests, cymem, murmurhash, preshed, srsly, wasabi, tqdm, blis, plac, catalogue, thinc, spacy, pytz, pandas, dataclasses, fastcore, fastai
-Successfully installed blis-0.4.1 catalogue-1.0.0 certifi-2020.6.20 chardet-3.0.4 cycler-0.10.0 cymem-2.0.3 dataclasses-0.6 fastai-2.0.6 fastcore-1.0.0 fastprogress-1.0.0 future-0.18.2 idna-2.10 joblib-0.16.0 kiwisolver-1.2.0 matplotlib-3.3.1 murmurhash-1.0.2 numpy-1.19.1 pandas-1.1.1 pillow-7.2.0 plac-1.1.3 preshed-3.0.2 pytz-2020.1 requests-2.24.0 scikit-learn-0.23.2 scipy-1.5.2 spacy-2.3.2 srsly-1.0.2 thinc-7.4.1 threadpoolctl-2.1.0 torch-1.6.0 torchvision-0.7.0 tqdm-4.48.2 urllib3-1.25.10 wasabi-0.8.0
-</pre>
+
+<div class="output_html rendered_html output_subarea ">
+<h4 id="parallel" class="doc_header">
+<a class="anchor" href="#parallel" aria-hidden="true"><span class="octicon octicon-link"></span></a><code>parallel</code><a href="https://github.com/fastai/fastcore/tree/master/fastcore/utils.py#L715" class="source_link" style="float:right">[source]</a>
+</h4>
+<blockquote>
+<p><code>parallel</code>(<strong><code>f</code></strong>, <strong><code>items</code></strong>, <strong>*<code>args</code></strong>, <strong><code>n_workers</code></strong>=<em><code>8</code></em>, <strong><code>total</code></strong>=<em><code>None</code></em>, <strong><code>progress</code></strong>=<em><code>None</code></em>, <strong><code>pause</code></strong>=<em><code>0</code></em>, <strong>**<code>kwargs</code></strong>)</p>
+</blockquote>
+<p>Applies <code>func</code> in parallel to <code>items</code>, using <code>n_workers</code></p>
+<p><a href="https://fastcore.fast.ai/utils#parallel" target="_blank" rel="noreferrer noopener">Show in docs</a></p>
+
 </div>
+
 </div>
 
 </div>

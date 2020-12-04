@@ -59,6 +59,8 @@ show_tags: true
 
 # Add your Google Analytics ID here if you have one and want to use it
 google_analytics: "UA-132452726-1"
+# GA4 mesurement id
+ga4_id: "G-RNNG0EY45E"
 
 exclude:
   - docker-compose.yml

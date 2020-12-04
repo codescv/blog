@@ -9,6 +9,10 @@
   {%- if jekyll.environment == 'production' and site.google_analytics -%}
     {%- include google-analytics.html -%}
   {%- endif -%}
+  
+  {%- if jekyll.environment == 'production' and site.ga4_id -%}
+    {%- include ga4.html -%}
+  {%- endif -%}
 
   {%- include custom-head.html -%}
   
